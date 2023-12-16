@@ -250,7 +250,7 @@ Provided this project is not over-ambitious, I would be happy to investigate any
 
 \bibliographystyle{unsrt}
 \bibliography{refs}
-
+\newpage
 \appendix
 \section{Notation}
 For clarity I use the following notation, which mimics how I'd handwrite vectors and matrices:
@@ -268,11 +268,13 @@ For clarity I use the following notation, which mimics how I'd handwrite vectors
         I_{m-1,0} & I_{m-1,1} & \cdots & I_{m-1,n-1} \\
     }$$
     for a $m\times n$ matrix $\mt I$ whose rows are $\{\vt r_0^T, \dots, \vt r_{m-1}^T\}$, columns are $\{\vt c_0, \dots, \vt c_{n-1}\}$, and elements are\\$\{I_{0,0}, \dots, I_{m-1,n-1}\}$.
-    \item Identity matrices are subscripted with their size. As a concrete example, a $3\times 3$ matrix is written as $\vt I_{3\times 3}$.
-    \item Where subscripts are used parametrise a vector, rather than indexing elements of a higher dimension mathematical structure (e.g. elements of a vector/matrix as used above), I use brackets, such as $w_{(k)}, \vt G_{(k)}$. These can also be thought as functions $w(k)$ and $\vt G(k)$.
+    \item Identity matrices, one-vectors and zero-vectors are subscripted with their size (Eg.\ $\mt I_{3\times 3}$ is a $3\times 3$ identity matrix, $\vt{1}_{1\times 3}$ is a length-$3$ row one-vector, and $\vt{0}_{3\times 1}$ is a length-$3$ column zero-vector.)
+    \item Where subscripts are used parametrise a vector, rather than indexing elements of a higher dimension mathematical structure (e.g. elements of a vector/matrix as used above), I use brackets, such as $w_{(k)}, \vts \mu_{(k)}, \mt G_{(k)}$. These can also be thought as functions that take $k$ as input and output a scalar, vector and matrix respectively.
 \end{itemize}
 
 \section{Theorem 1}
+This appendix presents the proof for the greyscale and colour version of Theorem 1. The proofs are structurally identical. The colour version just involves more matrix definitions and gymnastics.
+
 \subsection{Common Definitions}
 We consider images of height $H$ and width $W$, and index pixels from $\{0,\dots,HW-1\}$.
 
@@ -362,7 +364,7 @@ The last element $\left({\bar{\alpha}}_{(k)}\right)_{M^2}$ of $\vts{\bar{\alpha}
     &= \sum_{k=0}^{HW-1} \sum_{y=0}^{M^2-1} \sum_{x=0}^{M^2-1} \underbracket{\alpha_{n_x}  \left( \delta_{xy} - \frac1{M^2}\left(1 + \frac1{\frac\epsilon{M^2} + \sigma_{(k)}^2} \left({I}_{n_x} - \mu_{(k)}\right) \left({I}_{n_y} - \mu_{(k)}\right) \right) \right) \alpha_{n_y}}_{(*)}\\
     &\quad\ \text{(by Lemma \ref{lemma2})}
 \end{align*}
-The above expression performs a window sum $(*)$ over a $M\times M$ window for each window centre $k\in\{0,\dots,HW-1\}$. Equivalently, we can group together all summands $(*)$ that have the same pair $(n_x,n_y)\in\{0,\dots,HW-1\}^2$, and consider all possible pairs $(i,j)\in\{0,\dots,HW-1\}^2$:
+\hl{The above expression performs a window sum over a $M\times M$ window for each window centre $k\in\{0,\dots,HW-1\}$. Equivalently, we can group together all summands $(*)$ that have the same pair $(n_x,n_y)\in\{0,\dots,HW-1\}^2$, and consider all possible pairs $(i,j)\in\{0,\dots,HW-1\}^2$:}
 \begin{align*}
     J(\vts\alpha) &= \sum_{j=0}^{HW-1} \sum_{i=0}^{HW-1} \alpha_i \left(\sum_{\substack{k\in\{0,\dots,HW-1\}:\\i\in w_{(k)}\wedge j\in w_{(k)}}} \left( \delta_{ij} - \frac1{M^2}\left(1 + \frac1{\frac\epsilon{M^2} + \sigma_{(k)}^2} \left({I}_{i} - \mu_{(k)}\right) \left({I}_{j} - \mu_{(k)}\right) \right) \right)\right) \alpha_j\\
     &\triangleq \sum_{j=0}^{HW-1} \sum_{i=0}^{HW-1} \alpha_i L_{i,j} \alpha_j\\
@@ -405,7 +407,7 @@ where the notational change from $\delta_{xy}$ to $\delta_{ij}$ is justified bec
             &= \bmat{\sum_{m=0}^{M^2-1} I_{n_m}^2 + \epsilon & \sum_{m=0}^{M^2-1} I_{n_m} \\ \sum_{m=0}^{M^2-1} I_{n_m} & M^2 }\\
             &=  \bmat{\sum_{m=0}^{M^2-1} I_{n_m}^2 + \epsilon & M^2 \mu_{(k)} \\ M^2 \mu_{(k)} & M^2 }
         \end{align*}
-        For a $2\times 2$ matrix $\mt A=\bmat{a&b\\c&d}$ we have $\mt A^{-1} = \frac1{ad-bc}\bmat{d&-b\\-c & a}$, so
+        To invert a $2\times 2$ matrix, we use \cite[eq.\ (31)]{matrix-cookbook}:
         \begin{align*}
             \left(\mt G_{(k)}^T \mt G_{(k)}\right)^{-1} &= \frac1{M^2\sum_{m=0}^{M^2-1} I_{n_m}^2 + M^2\epsilon - M^4 \mu_{(k)}^2}  \bmat{M^2 & -M^2 \mu_{(k)} \\ -M^2 \mu_{(k)} & \sum_{m=0}^{M^2-1} I_{n_m}^2 + \epsilon }\\
             &= \frac1{\sum_{m=0}^{M^2-1} I_{n_m}^2  - M^2\mu_{(k)}^2 + \epsilon}  \bmat{1 & -\mu_{(k)} \\ -\mu_{(k)} & \frac1{M^2}\left(\sum_{m=0}^{M^2-1} I_{n_m}^2 + \epsilon\right)}\\
@@ -521,12 +523,9 @@ The last three elements $\left({\bar{\alpha}}_{(k)}\right)_{M^2}, \left({\bar{\a
     &= \sum_{k=0}^{HW-1} \sum_{y=0}^{M^2-1} \sum_{x=0}^{M^2-1} \underbracket{\alpha_{n_x}  \left( \delta_{xy} - \frac1{M^2}\left(1 + \left(\vt{I}_{n_x} - \vts \mu_{(k)}\right)^T \left(\mts \Sigma_k + \frac\epsilon{M^2} \mt{I}_{3\times 3}\right)^{-1} \left(\vt{I}_{n_y} - \vts \mu_{(k)}\right) \right) \right) \alpha_{n_y}}_{(*)}\\
     &\quad\ \text{(by Lemma \ref{lemma4})}
 \end{align*}
-
-CONTINUE HERE AFT LEMMA 4 MESS
-
-The above expression performs a window sum $(*)$ over a $M\times M$ window for each window centre $k\in\{0,\dots,HW-1\}$. Equivalently, we can group together all summands $(*)$ that have the same pair $(n_x,n_y)\in\{0,\dots,HW-1\}^2$, and consider all possible pairs $(i,j)\in\{0,\dots,HW-1\}^2$:
+\hl{The above expression performs a window sum over a $M\times M$ window for each window centre $k\in\{0,\dots,HW-1\}$. Equivalently, we can group together all summands $(*)$ that have the same pair $(n_x,n_y)\in\{0,\dots,HW-1\}^2$, and consider all possible pairs $(i,j)\in\{0,\dots,HW-1\}^2$:}
 \begin{align*}
-    J(\vts\alpha) &= \sum_{j=0}^{HW-1} \sum_{i=0}^{HW-1} \alpha_i \left(\sum_{\substack{k\in\{0,\dots,HW-1\}:\\i\in w_{(k)}\wedge j\in w_{(k)}}} \left( \delta_{ij} - \frac1{M^2}\left(1 + \frac1{\frac\epsilon{M^2} + \sigma_{(k)}^2} \left({I}_{i} - \mu_{(k)}\right) \left({I}_{j} - \mu_{(k)}\right) \right) \right)\right) \alpha_j\\
+    J(\vts\alpha) &= \sum_{j=0}^{HW-1} \sum_{i=0}^{HW-1} \alpha_i \left(\sum_{\substack{k\in\{0,\dots,HW-1\}:\\i\in w_{(k)}\wedge j\in w_{(k)}}} \left( \delta_{ij} - \frac1{M^2}\left(1 + \left(\vt{I}_{i} - \vts \mu_{(k)}\right)^T \left(\mts \Sigma_k + \frac\epsilon{M^2} \mt{I}_{3\times 3}\right)^{-1} \left(\vt{I}_{j} - \vts \mu_{(k)}\right) \right) \right)\right) \alpha_j\\
     &\triangleq \sum_{j=0}^{HW-1} \sum_{i=0}^{HW-1} \alpha_i L_{i,j} \alpha_j\\
     &\quad\quad\ \textgrey{\text{where $\mt L$ is the $HW\times HW$ sparse matrix defined in the previous line}}\\
     &= \vts \alpha^T \mt L\, \vts \alpha
@@ -566,7 +565,7 @@ where the notational change from $\delta_{xy}$ to $\delta_{ij}$ is justified bec
                 M^2 \mu_{(k)G}\mu_{(k)R} & M^2 \mu_{(k)G}\mu_{(k)G} & M^2 \mu_{(k)G}\mu_{(k)B} \\
                 M^2 \mu_{(k)B}\mu_{(k)R} & M^2 \mu_{(k)B}\mu_{(k)G} & M^2 \mu_{(k)B}\mu_{(k)B}
             \end{smallmatrix}\right]\\
-            M^2\mts \Sigma_{(k)}^2 + M^2 \vts\mu_{(k)}\vts\mu_{(k)}^T &= \left[\begin{smallmatrix}
+            M^2 \left(\mts \Sigma_{(k)}^2 + \vts\mu_{(k)}\vts\mu_{(k)}^T\right) &= \left[\begin{smallmatrix}
                 \sum_{m=0}^{M^2-1} I_{n_m,R}I_{n_m,R}  & \sum_{m=0}^{M^2-1} I_{n_m,R}I_{n_m,G}  & \sum_{m=0}^{M^2-1} I_{n_m,R}I_{n_m,B} \\
                 \sum_{m=0}^{M^2-1} I_{n_m,G}I_{n_m,R}  & \sum_{m=0}^{M^2-1} I_{n_m,G}I_{n_m,G}  & \sum_{m=0}^{M^2-1} I_{n_m,G}I_{n_m,B} \\
                 \sum_{m=0}^{M^2-1} I_{n_m,B}I_{n_m,R}  & \sum_{m=0}^{M^2-1} I_{n_m,B}I_{n_m,G}  & \sum_{m=0}^{M^2-1} I_{n_m,B}I_{n_m,B}
@@ -576,33 +575,93 @@ where the notational change from $\delta_{xy}$ to $\delta_{ij}$ is justified bec
         To find the $(x,y)$-th element of the matrix $\mt{\bar{G}}_{(k)}$, we consider the expression from inside-out.
         \begin{align*}
             \mt G_{(k)}^T \mt G_{(k)} &= \bmat{\mt A_{(k)} & \vt 1_{M^2\times 1} \\ \sqrt\epsilon \mt I_{3\times 3} & \vt 0_{3\times1}}^T  \bmat{\mt A_{(k)} & \vt 1_{M^2\times 1} \\ \sqrt\epsilon \mt I_{3\times 3} & \vt 0_{3\times1}}  \\
-            &= \bmat{\sum_{m=0}^{M^2-1} I_{n_m}^2 + \epsilon & \sum_{m=0}^{M^2-1} I_{n_m} \\ \sum_{m=0}^{M^2-1} I_{n_m} & M^2 }\\
-            &=  \bmat{\sum_{m=0}^{M^2-1} I_{n_m}^2 + \epsilon & M^2 \mu_{(k)} \\ M^2 \mu_{(k)} & M^2 }
+            &= \bmat{\mt A_{(k)}^T\mt A_{(k)} + \epsilon\mt I_{3\times 3} & \mt A_{(k)}^T\vt 1_{M^2\times 1} \\ \vt 1_{1\times M^2}\mt A_{(k)}  & \vt 1_{1\times M^2}\vt 1_{M^2\times 1} } \qquad\text{(by \cite[\S9.1.1]{matrix-cookbook})}\\
+            &=  M^2 \bmat{\mts \Sigma_{(k)} + \vts\mu_{(k)}\vts\mu_{(k)}^T + \frac\epsilon{M^2}\mt I_{3\times 3}  &  \vts \mu_{(k)} \\  \vts \mu_{(k)}^T & 1  }\\
+            &=  M^2 \bmat{
+                \mt B_{(k)} + \vts\mu_{(k)}\vts\mu_{(k)}^T  &  \vts \mu_{(k)} \\
+                \vts \mu_{(k)}^T & 1
+            } \\
+            &\quad\quad\ \textgrey{\text{where we define $3\times 3$ matrix $\mt B_{(k)}\triangleq \mts \Sigma_{(k)}+\tfrac\epsilon{M^2}\mt I_{3\times 3}$ for convenience}}
         \end{align*}
-        For a $2\times 2$ matrix $\mt A=\bmat{a&b\\c&d}$ we have $\mt A^{-1} = \frac1{ad-bc}\bmat{d&-b\\-c & a}$, so
+        To invert a block matrix, we use \cite[\S9.1.3]{matrix-cookbook}. We define these intermediate matrices from $\mt G_{(k)}^T \mt G_{(k)}$ as in the cookbook:
         \begin{align*}
-            \left(\mt G_{(k)}^T \mt G_{(k)}\right)^{-1} &= \frac1{M^2\sum_{m=0}^{M^2-1} I_{n_m}^2 + M^2\epsilon - M^4 \mu_{(k)}^2}  \bmat{M^2 & -M^2 \mu_{(k)} \\ -M^2 \mu_{(k)} & \sum_{m=0}^{M^2-1} I_{n_m}^2 + \epsilon }\\
-            &= \frac1{\sum_{m=0}^{M^2-1} I_{n_m}^2  - M^2\mu_{(k)}^2 + \epsilon}  \bmat{1 & -\mu_{(k)} \\ -\mu_{(k)} & \frac1{M^2}\left(\sum_{m=0}^{M^2-1} I_{n_m}^2 + \epsilon\right)}\\
-            &= \frac1{M^2\sigma_{(k)}^2 + \epsilon}  \bmat{1 & -\mu_{(k)} \\ -\mu_{(k)} & \frac1{M^2}\left(\sum_{m=0}^{M^2-1} I_{n_m}^2 + \epsilon\right)}
+            \mt C_1 &= M^2\mt B_{(k)} \cancel{+ M^2\vts\mu_{(k)}\vts\mu_{(k)}^T - M^2\vts\mu_{(k)}\frac1{M^2}M^2\vts\mu_{(k)}^T}\\
+            &= M^2 \mt B_{(k)}\\
+            C_2 &= M^2 - M^2\vts \mu_{(k)}^T \left(M^2\left(\mt B_{(k)} + \vts\mu_{(k)}\vts\mu_{(k)}^T\right)\right)^{-1}M^2\vts \mu_{(k)}\\
+            &= M^2 - M^2\vts \mu_{(k)}^T \left(\mt B_{(k)} + \vts\mu_{(k)}\vts\mu_{(k)}^T\right)^{-1}\vts \mu_{(k)}\\
+            &= M^2 - M^2\vts \mu_{(k)}^T\left(\mt B_{(k)}^{-1}\vts\mu_{(k)}\left(1 + \vts\mu_{(k)}^T \mt B_{(k)}^{-1} \vts\mu_{(k)}\right)^{-1}\right)  \qquad\text{(by \cite[eq.\ (162)]{matrix-cookbook})}\\
+            &\triangleq M^2 - zM^2\vts \mu_{(k)}^T\mt B_{(k)}^{-1}\vts\mu_{(k)}\\
+            &\quad\quad\ \textgrey{\text{where we define scalar $z\triangleq \tfrac1{1 + \vts\mu_{(k)}^T \mt B_{(k)}^{-1} \vts\mu_{(k)}}$ for convenience}}\\
+            &= M^2 - zM^2 \left(\frac1z - 1\right)\\
+            &= M^2 - M^2 \left(1-z \right)\\
+            &= zM^2
         \end{align*}
-        We only need to consider the upper-left $M^2\times M^2$ submatrix of the following $(M^2+1)\times (M^2+1)$ matrix:
+        Then the inverse of $\mt G_{(k)}^T \mt G_{(k)}$ is given by:
         \begin{align*}
-            \mt G_{(k)} \left(\mt G_{(k)}^T \mt G_{(k)}\right)^{-1} \mt G_{(k)}^T &= \frac1{M^2\sigma_{(k)}^2 + \epsilon}  \bmat{I_{n_0} & 1 \\ \vdots & \vdots \\ I_{n_{M^2-1}} & 1 \\ \sqrt\epsilon & 0} \bmat{1 & -\mu_{(k)} \\ -\mu_{(k)} & \frac1{M^2}\left(\sum_{m=0}^{M^2-1} I_{n_m}^2 + \epsilon\right)} \bmat{I_{n_0} & \cdots & I_{n_{M^2-1}} & \sqrt\epsilon \\ 1 & \cdots & 1 & 0}
+            \left(\mt G_{(k)}^T \mt G_{(k)}\right)^{-1} &= \bmat{
+                \mt C_1^{-1} & -\left(\cancel{M^2} \left(\mt B_{(k)} + \vts\mu_{(k)}\vts\mu_{(k)}^T\right)\right)^{-1}\cancel{M^2}\vts \mu_{(k)}C_2^{-1}\\
+                -C_2^{-1}\cancel{M^2}\vts\mu_{(k)}^T\left(\cancel{M^2} \left(\mt B_{(k)} + \vts\mu_{(k)}\vts\mu_{(k)}^T\right)\right)^{-1} & C_2^{-1}
+            }\\
+            &= \bmat{
+                \frac1{M^2} \mt B_{(k)}^{-1}  & -\frac1{zM^2}\left(\mt B_{(k)} + \vts\mu_{(k)}\vts\mu_{(k)}^T\right)^{-1}\vts\mu_{(k)} \\
+                -\frac1{zM^2} \vts\mu_{(k)}^T \left(\mt B_{(k)} + \vts\mu_{(k)}\vts\mu_{(k)}^T\right)^{-1} & \frac1{zM^2}
+            }\\
+            &= \bmat{
+                \frac1{M^2} \mt B_{(k)}^{-1}  & -\frac1{zM^2}\left(\mt B_{(k)} + \vts\mu_{(k)}\vts\mu_{(k)}^T\right)^{-1}\vts\mu_{(k)} \\
+                -\frac1{zM^2}\left(\left(\mt B_{(k)} + \vts\mu_{(k)}\vts\mu_{(k)}^T\right)^{-1}\vts\mu_{(k)}\right)^T    & \frac1{zM^2}
+            }\\
+            &\quad\quad\ \textgrey{\text{the off-diagonal block matrices are transposes of each other since $\mt G_{(k)}^T \mt G_{(k)}$ is symmetric}}\\
+            &\quad\quad\ \textgrey{\text{and the inverse of a symmetric matrix is also symmetric}}\\
+            &= \bmat{
+                \frac1{M^2} \mt B_{(k)}^{-1}  & -\frac1{zM^2} \mt B_{(k)}^{-1}\vts\mu_{(k)} \\
+                -\frac1{zM^2}\vts\mu_{(k)}^T \left(\mt B_{(k)}^{-1}\right)^T    & \frac1{z^2M^2}
+            }\\
+            &\quad\quad\ \textgrey{\text{using partial result from the derivation of $C_2$ above}}\\
+            &= \bmat{
+                \frac1{M^2} \mt B_{(k)}^{-1}  & -\frac1{M^2} \mt B_{(k)}^{-1}\vts\mu_{(k)} \\
+                -\frac1{M^2}\vts\mu_{(k)}^T \mt B_{(k)}^{-1}   & \frac1{zM^2}
+            }\\
+            &\quad\quad\ \textgrey{\text{since $\mt B_{(k)}$ is symmetric and the inverse of a symmetric matrix is also symmetric}}
         \end{align*}
+        We only need to consider the upper-left $M^2\times M^2$ submatrix of the following $(M^2+3)\times (M^2+3)$ matrix, thus the irrelevant submatrices can be crossed out:
+        \begin{align*}
+            \mt G_{(k)} \left(\mt G_{(k)}^T \mt G_{(k)}\right)^{-1} \mt G_{(k)}^T
+            &= \bmat{\mt A_{(k)} & \vt 1_{M^2\times 1} \\ \sqrt\epsilon \mt I_{3\times 3} & \vt 0_{3\times1}}
+            \bmat{
+                \frac1{M^2} \mt B_{(k)}^{-1}  & -\frac1{M^2} \mt B_{(k)}^{-1}\vts\mu_{(k)} \\
+                -\frac1{M^2}\vts\mu_{(k)}^T \mt B_{(k)}^{-1}   & \frac1{zM^2}
+            }
+            \bmat{\mt A_{(k)}^T & \sqrt\epsilon \mt I_{3\times 3} \\ \vt 1_{1\times M^2} & \vt 0_{1\times3}}\\
+            &= \bmat{\mt A_{(k)} & \vt 1_{M^2\times 1} \\ \times & \times}
+            \bmat{
+                \frac1{M^2} \mt B_{(k)}^{-1}  & -\frac1{M^2} \mt B_{(k)}^{-1}\vts\mu_{(k)} \\
+                -\frac1{M^2}\vts\mu_{(k)}^T \mt B_{(k)}^{-1}   & \frac1{zM^2}
+            }
+            \bmat{\mt A_{(k)}^T & \times \\ \vt 1_{1\times M^2} & \times}
+        \end{align*}
+        As a reminder, $\mt A_{(k)} \triangleq \bmat{\vt I_{n_0}^T \\ \vdots \\ \vt I_{n_{M^2-1}}^T}$ is a $M^2\times 3$ matrix, $\mt B_{(k)}$ is a $3 \times 3$ matrix, and $\vts \mu_{(k)}$ is a length-$3$ vector.
+
         Thus for $x,y\in\{0,\dots,M^2-1\}$:
         \begin{align*}
             \left(\mt G_{(k)} \left(\mt G_{(k)}^T \mt G_{(k)}\right)^{-1} \mt G_{(k)}^T\right)_{x,y}
-            &= \frac1{M^2\sigma_{(k)}^2 + \epsilon} \bmat{I_{n_x} & 1} \bmat{1 & -\mu_{(k)} \\ -\mu_{(k)} & \frac1{M^2}\left(\sum_{m=0}^{M^2-1} I_{n_m}^2 + \epsilon\right)} \bmat{I_{n_y} \\ 1}\\
-            &= \frac1{M^2\sigma_{(k)}^2 + \epsilon} \bmat{I_{n_x}-\mu_{(k)} & -\mu_{(k)}I_{n_x} + \frac1{M^2}\left(\sum_{m=0}^{M^2-1} I_{n_m}^2 + \epsilon\right)} \bmat{I_{n_y} \\ 1}\\
-            &= \frac1{M^2\sigma_{(k)}^2 + \epsilon} \left( I_{n_x}I_{n_y} - \mu_{(k)}I_{n_y} - \mu_{(k)}I_{n_x} + \frac1{M^2}\left(\sum_{m=0}^{M^2-1} I_{n_m}^2 + \epsilon\right) \right)\\
-            &= \frac1{M^2\sigma_{(k)}^2 + \epsilon} \left(\left(I_{n_x}-\mu_{(k)}\right) \left(I_{n_y}-\mu_{(k)}\right) + \cancelto{\sigma_{(k)}^2}{\frac1{M^2}\sum_{m=0}^{M^2-1} I_{n_m}^2 - \mu_{(k)}^2} + \frac1{M^2}\epsilon \right)\\
-            &= \frac1{M^2\sigma_{(k)}^2 + \epsilon} \left(I_{n_x}-\mu_{(k)}\right) \left(I_{n_y}-\mu_{(k)}\right) + \frac1{M^2}\\
-            &= \frac1{M^2}\left( 1 +  \frac1{\sigma_{(k)}^2 + \frac\epsilon{M^2}}\left(I_{n_x}-\mu_{(k)}\right) \left(I_{n_y}-\mu_{(k)}\right) \right)
+            &= \bmat{\vt I_{n_x}^T & 1} \bmat{
+                \frac1{M^2} \mt B_{(k)}^{-1}  & -\frac1{M^2} \mt B_{(k)}^{-1}\vts\mu_{(k)} \\
+                -\frac1{M^2}\vts\mu_{(k)}^T \mt B_{(k)}^{-1}   & \frac1{zM^2}
+            } \bmat{\vt I_{n_y} \\ 1}\\
+            &= \bmat{
+                \frac1{M^2}\vt I_{n_x}^T \mt B_{(k)}^{-1}-\frac1{M^2}\vts\mu_{(k)}^T \mt B_{(k)}^{-1}   & -\frac1{M^2} \vt I_{n_x}^T\mt B_{(k)}^{-1}\vts\mu_{(k)} + \frac1{zM^2}
+            } \bmat{\vt I_{n_y} \\ 1}\\
+            &= \frac1{M^2}\vt I_{n_x}^T \mt B_{(k)}^{-1}\vt I_{n_y} - \frac1{M^2}\vts\mu_{(k)}^T \mt B_{(k)}^{-1}\vt I_{n_y} -\frac1{M^2} \vt I_{n_x}^T\mt B_{(k)}^{-1}\vts\mu_{(k)} + \frac1{zM^2}\\
+            &= \frac1{M^2}\left(\mt I_{n_x} - \vts \mu_{(k)}\right)^T \mt B_{(k)}^{-1} \left(\mt I_{n_y} - \vts \mu_{(k)}\right) - \frac1{M^2}\vts \mu_{(k)}^T\mt B_{(k)}^{-1} \vts \mu_{(k)} + \frac1{zM^2}\\
+            &= \frac1{M^2}\left(\mt I_{n_x} - \vts \mu_{(k)}\right)^T \mt B_{(k)}^{-1} \left(\mt I_{n_y} - \vts \mu_{(k)}\right) - \frac1{M^2}\left(\frac1z-1\right) + \frac1{zM^2}\\
+            &= \frac1{M^2}\left(\mt I_{n_x} - \vts \mu_{(k)}\right)^T \mt B_{(k)}^{-1} \left(\mt I_{n_y} - \vts \mu_{(k)}\right) + \frac1{M^2}\\
+            &= \frac1{M^2} \left(1 + \left(\mt I_{n_x} - \vts \mu_{(k)}\right)^T \mt B_{(k)}^{-1} \left(\mt I_{n_y} - \vts \mu_{(k)}\right)\right)\\
+            &= \frac1{M^2} \left(1 + \left(\mt I_{n_x} - \vts \mu_{(k)}\right)^T \left(\mts \Sigma_{(k)}+\frac\epsilon{M^2}\mt I_{3\times 3}\right)^{-1} \left(\mt I_{n_y} - \vts \mu_{(k)}\right)\right)
         \end{align*}
         We are done:
         \begin{align*}
-            \left({\bar{G}}_{(k)}\right)_{x,y} &= \left(\mt I_{(M^2+1)\times(M^2+1)} - \mt G_{(k)} \left(\mt G_{(k)}^T \mt G_{(k)}\right)^{-1} \mt G_{(k)}^T\right)_{x,y} \\
-            &= \delta_{xy} - \frac1{M^2}\left( 1 +  \frac1{\frac\epsilon{M^2}+\sigma_{(k)}^2}\left(I_{n_x}-\mu_{(k)}\right) \left(I_{n_y}-\mu_{(k)}\right) \right)
+            \left({\bar{G}}_{(k)}\right)_{x,y} &= \left(\mt I_{(M^2+3)\times(M^2+3)} - \mt G_{(k)} \left(\mt G_{(k)}^T \mt G_{(k)}\right)^{-1} \mt G_{(k)}^T\right)_{x,y} \\
+            &= \delta_{xy} - \frac1{M^2}\left(1 + \left(\vt{I}_{n_x} - \vts \mu_{(k)}\right)^T \left(\mts \Sigma_k + \frac\epsilon{M^2} \mt{I}_{3\times 3}\right)^{-1} \left(\vt{I}_{n_y} - \vts \mu_{(k)}\right) \right)
         \end{align*}
     \end{proof}
 \end{lemma}
