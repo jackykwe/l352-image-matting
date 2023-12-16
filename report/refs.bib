@@ -1,0 +1,222 @@
+@inproceedings{bayesian-matting,
+  title        = {{A Bayesian approach to digital matting}},
+  volume       = {2},
+  issn         = {1063-6919},
+  url          = {https://ieeexplore.ieee.org/document/990970},
+  doi          = {10.1109/CVPR.2001.990970},
+  abstractnote = {This paper proposes a new Bayesian framework for solving the matting problem, i.e. extracting a foreground element from a background image by estimating an opacity for each pixel of the foreground element. Our approach models both the foreground and background color distributions with spatially-varying sets of Gaussians, and assumes a fractional blending of the foreground and background colors to produce the final output. It then uses a maximum-likelihood criterion to estimate the optimal opacity, foreground and background simultaneously. In addition to providing a principled approach to the matting problem, our algorithm effectively handles objects with intricate boundaries, such as hair strands and fur, and provides an improvement over existing techniques for these difficult cases.},
+  booktitle    = {Proceedings of the 2001 IEEE Computer Society Conference on Computer Vision and Pattern Recognition. CVPR 2001},
+  author       = {Chuang, Yung-Yu and Curless, B. and Salesin, D.H. and Szeliski, R.},
+  year         = {2001},
+  month        = dec,
+  pages        = {II–II}
+}
+
+
+@inproceedings{closed-form-matting,
+  author    = {D. Lischinski and A. Levin and Y. Weiss},
+  booktitle = {2013 IEEE Conference on Computer Vision and Pattern Recognition},
+  title     = {A Closed Form Solution to Natural Image Matting},
+  year      = {2006},
+  volume    = {2},
+  issn      = {1063-6919},
+  pages     = {61-68},
+  abstract  = {Interactive digital matting, the process of extracting a foreground object from an image based on limited user input, is an important task in image and video editing. From a computer vision perspective, this task is extremely challenging because it is massively ill-posed - at each pixel we must estimate the foreground and the background colors, as well as the foreground opacity (&quot;alpha matte&quot;) from a single color measurement. Current approaches either restrict the estimation to a small part of the image, estimating foreground and background colors based on nearby pixels where they are known, or perform iterative nonlinear estimation by alternating foreground and background color estimation with alpha estimation. In this paper we present a closed form solution to natural image matting. We derive a cost function from local smoothness assumptions on foreground and background colors, and show that in the resulting expression it is possible to analytically eliminate the foreground and background colors to obtain a quadratic cost function in alpha. This allows us to find the globally optimal alpha matte by solving a sparse linear system of equations. Furthermore, the closed form formula allows us to predict the properties of the solution by analyzing the eigenvectors of a sparse matrix, closely related to matrices used in spectral image segmentation algorithms. We show that high quality mattes can be obtained on natural images from a surprisingly small amount of user input.},
+  keywords  = {null},
+  doi       = {10.1109/CVPR.2006.18},
+  url       = {https://doi.ieeecomputersociety.org/10.1109/CVPR.2006.18},
+  publisher = {IEEE Computer Society},
+  address   = {Los Alamitos, CA, USA},
+  month     = {June}
+}
+
+
+@inproceedings{poisson-matting,
+  address      = {New York, NY, USA},
+  series       = {SIGGRAPH ’04},
+  title        = {Poisson matting},
+  isbn         = {978-1-4503-7823-9},
+  url          = {https://dl.acm.org/doi/10.1145/1186562.1015721},
+  doi          = {10.1145/1186562.1015721},
+  abstractnote = {In this paper, we formulate the problem of natural image matting as one of solving Poisson equations with the matte gradient field. Our approach, which we call Poisson matting, has the following advantages. First, the matte is directly reconstructed from a continuous matte gradient field by solving Poisson equations using boundary information from a user-supplied trimap. Second, by interactively manipulating the matte gradient field using a number of filtering tools, the user can further improve Poisson matting results locally until he or she is satisfied. The modified local result is seamlessly integrated into the final result. Experiments on many complex natural images demonstrate that Poisson matting can generate good matting results that are not possible using existing matting techniques.},
+  booktitle    = {ACM SIGGRAPH 2004 Papers},
+  publisher    = {Association for Computing Machinery},
+  author       = {Sun, Jian and Jia, Jiaya and Tang, Chi-Keung and Shum, Heung-Yeung},
+  year         = {2004},
+  month        = aug,
+  pages        = {315–321},
+  collection   = {SIGGRAPH ’04}
+}
+
+@inproceedings{robust-matting,
+  title        = {{Optimized Color Sampling for Robust Matting}},
+  issn         = {1063-6919},
+  url          = {https://ieeexplore.ieee.org/document/4270031},
+  doi          = {10.1109/CVPR.2007.383006},
+  abstractnote = {Image matting is the problem of determining for each pixel in an image whether it is foreground, background, or the mixing parameter, “alpha”, for those pixels that are a mixture of foreground and background. Matting is inherently an ill-posed problem. Previous matting approaches either use naive color sampling methods to estimate foreground and background colors for unknown pixels, or use propagation-based methods to avoid color sampling under weak assumptions about image statistics. We argue that neither method itself is enough to generate good results for complex natural images. We analyze the weaknesses of previous matting approaches, and propose a new robust matting algorithm. In our approach we also sample foreground and background colors for unknown pixels, but more importantly, analyze the confidence of these samples. Only high confidence samples are chosen to contribute to the matting energy function which is minimized by a Random Walk. The energy function we define also contains a neighborhood term to enforce the smoothness of the matte. To validate the approach, we present an extensive and quantitative comparison between our algorithm and a number of previous approaches in hopes of providing a benchmark for future matting research.},
+  booktitle    = {2007 IEEE Conference on Computer Vision and Pattern Recognition},
+  author       = {Wang, Jue and Cohen, Michael F.},
+  year         = {2007},
+  month        = jun,
+  pages        = {1–8}
+}
+
+
+@article{dnn-survey,
+  title        = {{Deep Image Matting: A Comprehensive Survey}},
+  url          = {http://arxiv.org/abs/2304.04672},
+  abstractnote = {Image matting refers to extracting precise alpha matte from natural images, and it plays a critical role in various downstream applications, such as image editing. Despite being an ill-posed problem, traditional methods have been trying to solve it for decades. The emergence of deep learning has revolutionized the field of image matting and given birth to multiple new techniques, including automatic, interactive, and referring image matting. This paper presents a comprehensive review of recent advancements in image matting in the era of deep learning. We focus on two fundamental sub-tasks: auxiliary input-based image matting, which involves user-defined input to predict the alpha matte, and automatic image matting, which generates results without any manual intervention. We systematically review the existing methods for these two tasks according to their task settings and network structures and provide a summary of their advantages and disadvantages. Furthermore, we introduce the commonly used image matting datasets and evaluate the performance of representative matting methods both quantitatively and qualitatively. Finally, we discuss relevant applications of image matting and highlight existing challenges and potential opportunities for future research. We also maintain a public repository to track the rapid development of deep image matting at https://github.com/JizhiziLi/matting-survey.},
+  note         = {arXiv:2304.04672 [cs]},
+  number       = {arXiv:2304.04672},
+  publisher    = {arXiv},
+  author       = {Li, Jizhizi and Zhang, Jing and Tao, Dacheng},
+  year         = {2023},
+  month        = apr
+}
+
+@article{sota-composition-1k,
+  title        = {{Rethinking Context Aggregation in Natural Image Matting}},
+  url          = {http://arxiv.org/abs/2304.01171},
+  abstractnote = {For natural image matting, context information plays a crucial role in estimating alpha mattes especially when it is challenging to distinguish foreground from its background. Exiting deep learning-based methods exploit specifically designed context aggregation modules to refine encoder features. However, the effectiveness of these modules has not been thoroughly explored. In this paper, we conduct extensive experiments to reveal that the context aggregation modules are actually not as effective as expected. We also demonstrate that when learned on large image patches, basic encoder-decoder networks with a larger receptive field can effectively aggregate context to achieve better performance.Upon the above findings, we propose a simple yet effective matting network, named AEMatter, which enlarges the receptive field by incorporating an appearance-enhanced axis-wise learning block into the encoder and adopting a hybrid-transformer decoder. Experimental results on four datasets demonstrate that our AEMatter significantly outperforms state-of-the-art matting methods (e.g., on the Adobe Composition-1K dataset, textbf{25%} and textbf{40%} reduction in terms of SAD and MSE, respectively, compared against MatteFormer). The code and model are available at url{https://github.com/QLYoo/AEMatter}.},
+  note         = {arXiv:2304.01171 [cs]},
+  number       = {arXiv:2304.01171},
+  publisher    = {arXiv},
+  author       = {Liu, Qinglin and Zhang, Shengping and Meng, Quanling and Li, Ru and Zhong, Bineng and Nie, Liqiang},
+  year         = {2023},
+  month        = apr
+}
+
+@inproceedings{dim-paper,
+  address      = {Honolulu, HI},
+  title        = {{Deep Image Matting}},
+  isbn         = {978-1-5386-0457-1},
+  url          = {http://ieeexplore.ieee.org/document/8099524/},
+  doi          = {10.1109/CVPR.2017.41},
+  abstractnote = {Image matting is a fundamental computer vision problem and has many applications. Previous algorithms have poor performance when an image has similar foreground and background colors or complicated textures. The main reasons are prior methods 1) only use low-level features and 2) lack high-level context. In this paper, we propose a novel deep learning based algorithm that can tackle both these problems. Our deep model has two parts. The ﬁrst part is a deep convolutional encoder-decoder network that takes an image and the corresponding trimap as inputs and predict the alpha matte of the image. The second part is a small convolutional network that reﬁnes the alpha matte predictions of the ﬁrst network to have more accurate alpha values and sharper edges. In addition, we also create a large-scale image matting dataset including 49300 training images and 1000 testing images. We evaluate our algorithm on the image matting benchmark, our testing set, and a wide variety of real images. Experimental results clearly demonstrate the superiority of our algorithm over previous methods.},
+  booktitle    = {2017 IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  publisher    = {IEEE},
+  author       = {Xu, Ning and Price, Brian and Cohen, Scott and Huang, Thomas},
+  year         = {2017},
+  month        = jul,
+  pages        = {311–320},
+  language     = {en}
+}
+
+
+
+
+
+
+
+
+
+@misc{depth-of-field-survey,
+  title        = {{GPU Gems Chapter 23. Depth of Field: A Survey of Techniques}},
+  author       = {NVIDIA Developer},
+  howpublished = {\url{https://developer.nvidia.com/gpugems/gpugems/part-iv-image-processing/chapter-23-depth-field-survey-techniques}},
+  note         = {Accessed 26 October 2023},
+  journal      = {NVIDIA Developer},
+  language     = {en-US}
+}
+
+@misc{depth-of-field-survey2,
+  title        = {{GPU Gems 3 Chapter 28. Practical Post-Process Depth of Field}},
+  howpublished = {\url{https://developer.nvidia.com/gpugems/gpugems3/part-iv-image-effects/chapter-28-practical-post-process-depth-field}},
+  author       = {NVIDIA Developer},
+  note         = {Accessed 26 October 2023},
+  language     = {en-US}
+}
+
+
+@inproceedings{dof-review-casual,
+  title        = {Algorithms for rendering depth of field effects in computer graphics},
+  author       = {Barsky, Brian A and Kosloff, Todd J},
+  booktitle    = {Proceedings of the 12th WSEAS international conference on Computers},
+  volume       = {2008},
+  year         = {2008},
+  organization = {World Scientific and Engineering Academy and Society (WSEAS)}
+}
+
+
+
+ @inproceedings{soln1,
+  address      = {Tokyo, Japan},
+  title        = {Fast depth of field rendering with surface splatting},
+  isbn         = {978-0-7695-1946-3},
+  url          = {http://ieeexplore.ieee.org/document/1214466/},
+  doi          = {10.1109/CGI.2003.1214466},
+  abstractnote = {We present a new fast algorithm for rendering the depthof-ﬁeld effect for point-based surfaces. The algorithm handles partial occlusion correctly, it does not suffer from intensity leakage and it renders depth-of-ﬁeld in presence of transparent surfaces. The algorithm is new in that it exploits the level-of-detail to select the surface detail according to the amount of depth-blur applied. This makes the speed of the algorithm practically independent of the amount of depth-blur. The proposed algorithm is an extension of the Elliptical Weighted Average (EWA) surface splatting. We present a mathematical analysis that extends the screen space EWA surface splatting to handle depth-of-ﬁeld rendering with level-of-detail, and we demonstrate the algorithm on example renderings.},
+  booktitle    = {Proceedings Computer Graphics International 2003},
+  publisher    = {IEEE Comput. Soc},
+  author       = {Krivanek, J. and Zara, J. and Bouatouch, K.},
+  year         = {2003},
+  pages        = {196–201},
+  language     = {en}
+}
+
+@article{soln2,
+  title        = {Laplacian kernel splatting for efficient depth-of-field and motion blur synthesis or reconstruction},
+  volume       = {37},
+  issn         = {0730-0301, 1557-7368},
+  doi          = {10.1145/3197517.3201379},
+  abstractnote = {Simulating combinations of depth-of-field and motion blur is an important factor to cinematic quality in synthetic images but can take long to compute. Splatting the point-spread function (PSF) of every pixel is general and provides high quality, but requires prohibitive compute time. We accelerate this in two steps: In a pre-process we optimize for sparse representations of the Laplacian of all possible PSFs that we call
+                  spreadlets.
+                  At runtime, spreadlets can be splat efficiently to the Laplacian of an image. Integrating this image produces the final result. Our approach scales faithfully to strong motion and large out-of-focus areas and compares favorably in speed and quality with off-line and interactive approaches. It is applicable to both synthesizing from pinhole as well as reconstructing from stochastic images, with or without layering.},
+  number       = {4},
+  journal      = {ACM Transactions on Graphics},
+  author       = {Leimkühler, Thomas and Seidel, Hans-Peter and Ritschel, Tobias},
+  year         = {2018},
+  month        = aug,
+  pages        = {1–11},
+  language     = {en}
+}
+
+@article{soln3,
+  title        = {{DeepLens: Shallow Depth Of Field From A Single Image}},
+  url          = {http://arxiv.org/abs/1810.08100},
+  abstractnote = {We aim to generate high resolution shallow depth-of-field (DoF) images from a single all-in-focus image with controllable focal distance and aperture size. To achieve this, we propose a novel neural network model comprised of a depth prediction module, a lens blur module, and a guided upsampling module. All modules are differentiable and are learned from data. To train our depth prediction module, we collect a dataset of 2462 RGB-D images captured by mobile phones with a dual-lens camera, and use existing segmentation datasets to improve border prediction. We further leverage a synthetic dataset with known depth to supervise the lens blur and guided upsampling modules. The effectiveness of our system and training strategies are verified in the experiments. Our method can generate high-quality shallow DoF images at high resolution, and produces significantly fewer artifacts than the baselines and existing solutions for single image shallow DoF synthesis. Compared with the iPhone portrait mode, which is a state-of-the-art shallow DoF solution based on a dual-lens depth camera, our method generates comparable results, while allowing for greater flexibility to choose focal points and aperture size, and is not limited to one capture setup.},
+  note         = {arXiv:1810.08100 [cs]},
+  number       = {arXiv:1810.08100},
+  publisher    = {arXiv},
+  author       = {Wang, Lijun and Shen, Xiaohui and Zhang, Jianming and Wang, Oliver and Lin, Zhe and Hsieh, Chih-Yao and Kong, Sarah and Lu, Huchuan},
+  year         = {2018},
+  month        = oct
+}
+@inproceedings{soln4,
+  address   = {Virtual Event USA},
+  title     = {{Hybrid DoF: Ray-Traced and Post-Processed Hybrid Depth of Field Effect for Real-Time Rendering}},
+  isbn      = {978-1-4503-7973-1},
+  url       = {https://dl.acm.org/doi/10.1145/3388770.3407426},
+  doi       = {10.1145/3388770.3407426},
+  booktitle = {ACM SIGGRAPH 2020 Posters},
+  publisher = {ACM},
+  author    = {Wei, Tan Yu and Chua, Nicholas and Biette, Nathan and Bhojan, Anand},
+  year      = {2020},
+  month     = aug,
+  pages     = {1–2},
+  language  = {en}
+}
+ @inproceedings{soln5,
+  address      = {Thessaloniki, Greece},
+  title        = {Real-time, accurate depth of field using anisotropic diffusion and programmable graphics cards},
+  isbn         = {978-0-7695-2223-4},
+  url          = {http://ieeexplore.ieee.org/document/1335393/},
+  doi          = {10.1109/TDPVT.2004.1335393},
+  abstractnote = {Computer graphics cameras lack the ﬁnite Depth of Field (DOF) present in real world ones. This results in all objects being rendered sharp regardless of their depth, reducing the realism of the scene. On top of that, real-world DOF provides a depth cue, that helps the human visual system decode the elements of a scene. Several methods have been proposed to render images with ﬁnite DOF, but these have always implied an important trade-off between speed and accuracy. In this paper, we introduce a novel anisotropic diffusion Partial Differential Equation (PDE) that is applied to the 2D image of the scene rendered with a pin-hole camera. In this PDE, the amount of blurring on the 2D image depends on the depth information of the 3D scene, present in the Z-buffer. This equation is well posed, has existence and uniqueness results, and it is a good approximation of the optical phenomenon, without the visual artifacts and depth inconsistencies present in other approaches. Because both inputs to our algorithm are present at the graphics card at every moment, we can run the processing entirely in the GPU. This fact, coupled with the particular numerical scheme chosen for our PDE, allows for real-time rendering using a programmable graphics card.},
+  booktitle    = {Proceedings. 2nd International Symposium on 3D Data Processing, Visualization and Transmission, 2004. 3DPVT 2004.},
+  publisher    = {IEEE},
+  author       = {Bertalmio, M. and Fort, P. and Sanchez-Crespo, D.},
+  year         = {2004},
+  pages        = {767–773},
+  language     = {en}
+}
+
+@article{matrix-cookbook,
+  title   = {The matrix cookbook},
+  author  = {Petersen, Kaare Brandt and Pedersen, Michael Syskind and others},
+  journal = {Technical University of Denmark},
+  volume  = {7},
+  number  = {15},
+  pages   = {510},
+  year    = {2008}
+}
