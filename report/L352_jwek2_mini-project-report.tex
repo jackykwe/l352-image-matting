@@ -343,7 +343,7 @@ We first re-write $J(\vts\alpha)$ in matrix notation:
     &\quad\quad\ \textgrey{\text{and $\vts{\bar{\alpha}}_{(k)}$ is the length-$(M^2+1)$ vector defined in the previous line}}\\
     &= \sum_{k=0}^{HW-1} \left\| \mt G_{(k)} \bmat{\hat{a}_k\\\hat{b}_k} - \vts{\bar{\alpha}}_{(k)} \right\|^2
 \end{align*}
-We first eliminate $\vt{\hat{a}},\vt{\hat{b}}$ from the expression, by performing the inner maximisation for a given $\vts\alpha$ using the pseudo-inverse:
+We first eliminate $\vt{\hat{a}},\vt{\hat{b}}$ from the expression, by performing the minimisation for a given $\vts\alpha$ using the pseudo-inverse:
 \begin{align*}
     \hat{a}_k, \hat{b}_k &= \argmin_{a_k,b_k} \left\| \mt G_{(k)} \bmat{a_k\\b_k} - \vts{\bar{\alpha}}_{(k)} \right\|^2\\
     \bmat{\hat{a}_k\\\hat{b}_k} &= \left(\mt G_{(k)}^T \mt G_{(k)} \right)^{-1} \mt G_{(k)}^T \vts{\bar{\alpha}}_{(k)}
@@ -472,7 +472,7 @@ where
         &= \bmat{\mu_{(k)R} \\ \mu_{(k)G} \\ \mu_{(k)B}}
     \end{align*} is length-$3$ vector mean of the RGB pixel values in the neighbourhood of pixel $k$, and
     \item \begin{align*}
-        \mts \Sigma^2_{(k)}
+        \mts \Sigma_{(k)}
         &= \frac1{M^2} \sum_{n\in w_{(k)}} \left(\vt I_{n}-\vts \mu_{(k)}\right) \left(\vt I_{n}-\vts \mu_{(k)}\right)^T\\
         &= \frac1{M^2} \sum_{m=0}^{M^2-1} \left(\vt I_{n_m}-\vts \mu_{(k)}\right) \left(\vt I_{n_m}-\vts \mu_{(k)}\right)^T\\
         &= \frac1{M^2} \left[\begin{smallmatrix}
@@ -502,7 +502,7 @@ We first re-write $J(\vts\alpha)$ in matrix notation:
     &\quad\quad\ \textgrey{\text{and $\vts{\bar{\alpha}}_{(k)}$ is the length-$(M^2+3)$ vector defined in the previous line}}\\
     &= \sum_{k=0}^{HW-1} \left\| \mt G_{(k)} \bmat{\hat{a}_k\\\hat{b}_k} - \vts{\bar{\alpha}}_{(k)} \right\|^2
 \end{align*}
-We first eliminate $\vt{\hat{a}},\vt{\hat{b}}$ from the expression, by performing the inner maximisation for a given $\vts\alpha$ using the pseudo-inverse:
+We first eliminate $\vt{\hat{a}},\vt{\hat{b}}$ from the expression, by performing the minimisation for a given $\vts\alpha$ using the pseudo-inverse:
 \begin{align*}
     \hat{a}_k, \hat{b}_k &= \argmin_{a_k,b_k} \left\| \mt G_{(k)} \bmat{a_k\\b_k} - \vts{\bar{\alpha}}_{(k)} \right\|^2\\
     \bmat{\hat{a}_k\\\hat{b}_k} &= \left(\mt G_{(k)}^T \mt G_{(k)} \right)^{-1} \mt G_{(k)}^T \vts{\bar{\alpha}}_{(k)}
@@ -552,7 +552,7 @@ where the notational change from $\delta_{xy}$ to $\delta_{ij}$ is justified bec
         \begin{align*}
             \vts \mu_{(k)} &= \frac1{M^2} \sum_{m=0}^{M^2-1} \vt I_{n_m} \\
             &= \bmat{\mu_{(k)R} \\ \mu_{(k)G} \\ \mu_{(k)B}}\\
-            \mts \Sigma^2_{(k)} &= \left[\begin{smallmatrix}
+            \mts \Sigma_{(k)} &= \left[\begin{smallmatrix}
                 \frac1{M^2} \sum_{m=0}^{M^2-1} I_{n_m,R}I_{n_m,R} - \mu_{(k)R}\mu_{(k)R} & \frac1{M^2} \sum_{m=0}^{M^2-1} I_{n_m,R}I_{n_m,G} - \mu_{(k)R}\mu_{(k)G} & \frac1{M^2} \sum_{m=0}^{M^2-1} I_{n_m,R}I_{n_m,B} - \mu_{(k)R}\mu_{(k)B}\\
                 \frac1{M^2} \sum_{m=0}^{M^2-1} I_{n_m,G}I_{n_m,R} - \mu_{(k)G}\mu_{(k)R} & \frac1{M^2} \sum_{m=0}^{M^2-1} I_{n_m,G}I_{n_m,G} - \mu_{(k)G}\mu_{(k)G} & \frac1{M^2} \sum_{m=0}^{M^2-1} I_{n_m,G}I_{n_m,B} - \mu_{(k)G}\mu_{(k)B}\\
                 \frac1{M^2} \sum_{m=0}^{M^2-1} I_{n_m,B}I_{n_m,R} - \mu_{(k)B}\mu_{(k)R} & \frac1{M^2} \sum_{m=0}^{M^2-1} I_{n_m,B}I_{n_m,G} - \mu_{(k)B}\mu_{(k)G} & \frac1{M^2} \sum_{m=0}^{M^2-1} I_{n_m,B}I_{n_m,B} - \mu_{(k)B}\mu_{(k)B}
@@ -565,7 +565,7 @@ where the notational change from $\delta_{xy}$ to $\delta_{ij}$ is justified bec
                 M^2 \mu_{(k)G}\mu_{(k)R} & M^2 \mu_{(k)G}\mu_{(k)G} & M^2 \mu_{(k)G}\mu_{(k)B} \\
                 M^2 \mu_{(k)B}\mu_{(k)R} & M^2 \mu_{(k)B}\mu_{(k)G} & M^2 \mu_{(k)B}\mu_{(k)B}
             \end{smallmatrix}\right]\\
-            M^2 \left(\mts \Sigma_{(k)}^2 + \vts\mu_{(k)}\vts\mu_{(k)}^T\right) &= \left[\begin{smallmatrix}
+            M^2 \left(\mts \Sigma_{(k)} + \vts\mu_{(k)}\vts\mu_{(k)}^T\right) &= \left[\begin{smallmatrix}
                 \sum_{m=0}^{M^2-1} I_{n_m,R}I_{n_m,R}  & \sum_{m=0}^{M^2-1} I_{n_m,R}I_{n_m,G}  & \sum_{m=0}^{M^2-1} I_{n_m,R}I_{n_m,B} \\
                 \sum_{m=0}^{M^2-1} I_{n_m,G}I_{n_m,R}  & \sum_{m=0}^{M^2-1} I_{n_m,G}I_{n_m,G}  & \sum_{m=0}^{M^2-1} I_{n_m,G}I_{n_m,B} \\
                 \sum_{m=0}^{M^2-1} I_{n_m,B}I_{n_m,R}  & \sum_{m=0}^{M^2-1} I_{n_m,B}I_{n_m,G}  & \sum_{m=0}^{M^2-1} I_{n_m,B}I_{n_m,B}
@@ -610,7 +610,7 @@ where the notational change from $\delta_{xy}$ to $\delta_{ij}$ is justified bec
                 \frac1{M^2} \mt B_{(k)}^{-1}  & -\frac1{zM^2}\left(\mt B_{(k)} + \vts\mu_{(k)}\vts\mu_{(k)}^T\right)^{-1}\vts\mu_{(k)} \\
                 -\frac1{zM^2}\left(\left(\mt B_{(k)} + \vts\mu_{(k)}\vts\mu_{(k)}^T\right)^{-1}\vts\mu_{(k)}\right)^T    & \frac1{zM^2}
             }\\
-            &\quad\quad\ \textgrey{\text{the off-diagonal block matrices are transposes of each other since $\mt G_{(k)}^T \mt G_{(k)}$ is symmetric}}\\
+            &\quad\quad\ \textgrey{\text{the off-diagonal submatrices are transposes of each other since $\mt G_{(k)}^T \mt G_{(k)}$ is symmetric}}\\
             &\quad\quad\ \textgrey{\text{and the inverse of a symmetric matrix is also symmetric}}\\
             &= \bmat{
                 \frac1{M^2} \mt B_{(k)}^{-1}  & -\frac1{zM^2} \mt B_{(k)}^{-1}\vts\mu_{(k)} \\
