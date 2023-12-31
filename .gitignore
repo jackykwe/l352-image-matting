@@ -4,6 +4,9 @@ matting
 # Datasets
 datasets
 
+# MATLAB code by original author
+matlab
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
