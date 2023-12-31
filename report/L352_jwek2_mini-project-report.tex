@@ -309,7 +309,7 @@ $$\vts\alpha = \bmat{\alpha_0\\\vdots\\\alpha_{HW-1}}.$$
 Define the image cost function $J(\vts\alpha)$ as
 \begin{align*}
     J(\vts\alpha) &= \min_{\vt a,\vt b} J(\vts\alpha, \vt a, \vt b)\\
-    &= \min_{\vt a,\vt b} \sum_{k=0}^{HW-1} \left(\sum_{m=0}^{M^2-1} \left(\alpha_{n_m} - a_kI_{n_m} - b_i\right)^2 + \epsilon a_k^2 \right)%\\
+    &= \min_{\vt a,\vt b} \sum_{k=0}^{HW-1} \left(\sum_{m=0}^{M^2-1} \left(\alpha_{n_m} - a_kI_{n_m} - b_k\right)^2 + \epsilon a_k^2 \right)%\\
 %    &= \min_{\vts \alpha} \sum_{j=0}^{HW-1} \left(\sum_{i=0}^{HW-1} (\alpha_i - \hat{a}_jI_i - \hat{b}_j)^2 + \epsilon \hat{a}_j^2 \right)
 \end{align*}
 for some length-$HW$ vectors $\vt a, \vt b$ and neighbourhood $w_{(k)}=\{n_0,\dots,n_{M^2-1}\}$.
@@ -450,7 +450,7 @@ $$\vts\alpha = \bmat{\alpha_0\\\vdots\\\alpha_{HW-1}}.$$
 Define the image cost function $J(\vts\alpha)$ as
 \begin{align*}
     J(\vts\alpha) &= \min_{\mt a,\vt b} J(\vts\alpha, \mt a, \vt b)\\
-    &= \min_{\mt a,\vt b} \sum_{k=0}^{HW-1} \left(\sum_{m=0}^{M^2-1} \left(\alpha_{n_m} - \vt a_k^T \vt I_{n_m} - b_i\right)^2 + \epsilon \vt a_k^T \vt a_k \right)%\\
+    &= \min_{\mt a,\vt b} \sum_{k=0}^{HW-1} \left(\sum_{m=0}^{M^2-1} \left(\alpha_{n_m} - \vt a_k^T \vt I_{n_m} - b_k\right)^2 + \epsilon \vt a_k^T \vt a_k \right)%\\
 %    &= \min_{\vts \alpha} \sum_{j=0}^{HW-1} \left(\sum_{i=0}^{HW-1} (\alpha_i - \hat{a}_jI_i - \hat{b}_j)^2 + \epsilon \hat{a}_j^2 \right)
 \end{align*}
 for some $HW\times 3$ matrix $\mt a=\bmat{\vt a_{0}^T \\ \vdots \\ \vt a_{HW-1}^T}$ defined similarly as $\mt I$, some length-$HW$ vector $\vt b$, and neighbourhood $w_{(k)}=\{n_0,\dots,n_{M^2-1}\}$.
@@ -458,7 +458,7 @@ for some $HW\times 3$ matrix $\mt a=\bmat{\vt a_{0}^T \\ \vdots \\ \vt a_{HW-1}^
 Then, the theorem states that
 $$J(\vts \alpha) = \vts \alpha^T \mt L\, \vts \alpha$$
 where $L$ is an $HW\times HW$ matrix, whose $(i,j)$-th entry (for $i,j\in\{0,\dots,HW-1\}$) is
-$$L_{i,j} = \sum_{\substack{k\in\{0,\dots,HW-1\}:\\i\in w_k\wedge j\in w_k}} \left( \delta_{ij} - \frac1{M^2}\left(1 + \left(\vt{I}_i - \vts \mu_{(k)}\right)^T \left(\mts \Sigma_k + \frac\epsilon{M^2} \mt{I}_{3\times 3}\right)^{-1} \left(\vt{I}_j - \vts \mu_{(k)}\right) \right) \right)$$
+$$L_{i,j} = \sum_{\substack{k\in\{0,\dots,HW-1\}:\\i\in w_k\wedge j\in w_k}} \left( \delta_{ij} - \frac1{M^2}\left(1 + \left(\vt{I}_i - \vts \mu_{(k)}\right)^T \left(\mts \Sigma_{(k)} + \frac\epsilon{M^2} \mt{I}_{3\times 3}\right)^{-1} \left(\vt{I}_j - \vts \mu_{(k)}\right) \right) \right)$$
 where
 \begin{itemize}
     \item $\delta_{ij} = \begin{cases}
@@ -495,7 +495,7 @@ which contains the RGB pixel values in the neighbourhood of pixel $k$.
 
 We first re-write $J(\vts\alpha)$ in matrix notation:
 \begin{align*}
-    J(\vts\alpha) &= \min_{\mt a,\vt b} \sum_{k=0}^{HW-1} \left(\sum_{m=0}^{M^2-1} \left(\alpha_{n_m} - \vt a_k^T \vt I_{n_m} - b_i\right)^2 + \epsilon \vt a_k^T \vt a_k \right) \\
+    J(\vts\alpha) &= \min_{\mt a,\vt b} \sum_{k=0}^{HW-1} \left(\sum_{m=0}^{M^2-1} \left(\alpha_{n_m} - \vt a_k^T \vt I_{n_m} - b_k\right)^2 + \epsilon \vt a_k^T \vt a_k \right) \\
     &= \sum_{k=0}^{HW-1}  \min_{\vt a_k,b_k} \left\| \bmat{\mt A_{(k)} & \vt 1_{M^2\times 1} \\ \sqrt\epsilon \mt I_{3\times 3} & \vt 0_{3\times1}} \bmat{\vt a_k\\b_k} - \bmat{\alpha_{n_0} \\ \vdots \\ \alpha_{n_{M^2-1}} \\ 0 \\ 0 \\ 0} \right\|^2 \\
     &\triangleq \sum_{k=0}^{HW-1} \min_{a_k,b_k} \left\| \mt G_{(k)} \bmat{a_k\\b_k} - \vts{\bar{\alpha}}_{(k)} \right\|^2\\
     &\quad\quad\ \textgrey{\text{where $\mt G_{(k)}$ is the $(M^2+3) \times 4$ matrix defined in the previous line}}\\
@@ -520,12 +520,12 @@ Continuing the simplification of $J(\vts\alpha)$:
 The last three elements $\left({\bar{\alpha}}_{(k)}\right)_{M^2}, \left({\bar{\alpha}}_{(k)}\right)_{M^2+1}, \left({\bar{\alpha}}_{(k)}\right)_{M^2+2}$ of $\vts{\bar{\alpha}}_{(k)}$ are always zero by definition above. Therefore, the summation bounds for $x,y$ can be reduced, and we thus only need consider the upper-left $M^2\times M^2$ submatrix of ${\mt{\bar{G}}}_{(k)}$ in Lemma \ref{lemma4}:
 \begin{align*}
     J(\vts\alpha) &= \sum_{k=0}^{HW-1} \sum_{y=0}^{M^2-1} \sum_{x=0}^{M^2-1} \alpha_{n_x}  \left({\bar{G}}_{(k)}\right)_{x,y} \alpha_{n_y}\\
-    &= \sum_{k=0}^{HW-1} \sum_{y=0}^{M^2-1} \sum_{x=0}^{M^2-1} \underbracket{\alpha_{n_x}  \left( \delta_{xy} - \frac1{M^2}\left(1 + \left(\vt{I}_{n_x} - \vts \mu_{(k)}\right)^T \left(\mts \Sigma_k + \frac\epsilon{M^2} \mt{I}_{3\times 3}\right)^{-1} \left(\vt{I}_{n_y} - \vts \mu_{(k)}\right) \right) \right) \alpha_{n_y}}_{(*)}\\
+    &= \sum_{k=0}^{HW-1} \sum_{y=0}^{M^2-1} \sum_{x=0}^{M^2-1} \underbracket{\alpha_{n_x}  \left( \delta_{xy} - \frac1{M^2}\left(1 + \left(\vt{I}_{n_x} - \vts \mu_{(k)}\right)^T \left(\mts \Sigma_{(k)} + \frac\epsilon{M^2} \mt{I}_{3\times 3}\right)^{-1} \left(\vt{I}_{n_y} - \vts \mu_{(k)}\right) \right) \right) \alpha_{n_y}}_{(*)}\\
     &\quad\ \text{(by Lemma \ref{lemma4})}
 \end{align*}
 \hl{The above expression performs a window sum over a $M\times M$ window for each window centre $k\in\{0,\dots,HW-1\}$. Equivalently, we can group together all summands $(*)$ that have the same pair $(n_x,n_y)\in\{0,\dots,HW-1\}^2$, and consider all possible pairs $(i,j)\in\{0,\dots,HW-1\}^2$:}
 \begin{align*}
-    J(\vts\alpha) &= \sum_{j=0}^{HW-1} \sum_{i=0}^{HW-1} \alpha_i \left(\sum_{\substack{k\in\{0,\dots,HW-1\}:\\i\in w_{(k)}\wedge j\in w_{(k)}}} \left( \delta_{ij} - \frac1{M^2}\left(1 + \left(\vt{I}_{i} - \vts \mu_{(k)}\right)^T \left(\mts \Sigma_k + \frac\epsilon{M^2} \mt{I}_{3\times 3}\right)^{-1} \left(\vt{I}_{j} - \vts \mu_{(k)}\right) \right) \right)\right) \alpha_j\\
+    J(\vts\alpha) &= \sum_{j=0}^{HW-1} \sum_{i=0}^{HW-1} \alpha_i \left(\sum_{\substack{k\in\{0,\dots,HW-1\}:\\i\in w_{(k)}\wedge j\in w_{(k)}}} \left( \delta_{ij} - \frac1{M^2}\left(1 + \left(\vt{I}_{i} - \vts \mu_{(k)}\right)^T \left(\mts \Sigma_{(k)} + \frac\epsilon{M^2} \mt{I}_{3\times 3}\right)^{-1} \left(\vt{I}_{j} - \vts \mu_{(k)}\right) \right) \right)\right) \alpha_j\\
     &\triangleq \sum_{j=0}^{HW-1} \sum_{i=0}^{HW-1} \alpha_i L_{i,j} \alpha_j\\
     &\quad\quad\ \textgrey{\text{where $\mt L$ is the $HW\times HW$ sparse matrix defined in the previous line}}\\
     &= \vts \alpha^T \mt L\, \vts \alpha
@@ -543,7 +543,7 @@ where the notational change from $\delta_{xy}$ to $\delta_{ij}$ is justified bec
 
 \begin{lemma}\label{lemma4}
     $\forall k\in\{0,\dots,HW-1\}.\ \forall x,y\in\{0,\dots, M^2-1\}.$
-    $$\left({\bar{G}}_{(k)}\right)_{x,y} = \delta_{xy} - \frac1{M^2}\left(1 + \left(\vt{I}_{n_x} - \vts \mu_{(k)}\right)^T \left(\mts \Sigma_k + \frac\epsilon{M^2} \mt{I}_{3\times 3}\right)^{-1} \left(\vt{I}_{n_y} - \vts \mu_{(k)}\right) \right)$$
+    $$\left({\bar{G}}_{(k)}\right)_{x,y} = \delta_{xy} - \frac1{M^2}\left(1 + \left(\vt{I}_{n_x} - \vts \mu_{(k)}\right)^T \left(\mts \Sigma_{(k)} + \frac\epsilon{M^2} \mt{I}_{3\times 3}\right)^{-1} \left(\vt{I}_{n_y} - \vts \mu_{(k)}\right) \right)$$
     Note that $\mt{\bar{G}}_{(k)}$ is a $(M^2+3)\times (M^2+3)$ matrix, but we only find the expression of its scalar elements in its upper-left $M^2\times M^2$ submatrix.
     \begin{proof}
         For arbitrary $i\in\{0,\dots,HW-1\}$, by definition we have
@@ -661,7 +661,7 @@ where the notational change from $\delta_{xy}$ to $\delta_{ij}$ is justified bec
         We are done:
         \begin{align*}
             \left({\bar{G}}_{(k)}\right)_{x,y} &= \left(\mt I_{(M^2+3)\times(M^2+3)} - \mt G_{(k)} \left(\mt G_{(k)}^T \mt G_{(k)}\right)^{-1} \mt G_{(k)}^T\right)_{x,y} \\
-            &= \delta_{xy} - \frac1{M^2}\left(1 + \left(\vt{I}_{n_x} - \vts \mu_{(k)}\right)^T \left(\mts \Sigma_k + \frac\epsilon{M^2} \mt{I}_{3\times 3}\right)^{-1} \left(\vt{I}_{n_y} - \vts \mu_{(k)}\right) \right)
+            &= \delta_{xy} - \frac1{M^2}\left(1 + \left(\vt{I}_{n_x} - \vts \mu_{(k)}\right)^T \left(\mts \Sigma_{(k)} + \frac\epsilon{M^2} \mt{I}_{3\times 3}\right)^{-1} \left(\vt{I}_{n_y} - \vts \mu_{(k)}\right) \right)
         \end{align*}
     \end{proof}
 \end{lemma}
