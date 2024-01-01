@@ -1,5 +1,9 @@
+import time
+
 import numpy as np
 import scipy.ndimage as spndimage
+from scipy import linalg as splinalg
+from tqdm.auto import tqdm
 
 import explicit
 import sampling
@@ -32,22 +36,42 @@ def get_linear_coefficients(alpha, I, epsilon, window_size):
     neighbourhood_size = (1 + 2 * window_size) ** 2  # this is neb_size in MATLAB
     H, W, C = I.shape
     result = np.zeros((H, W, C + 1))  # a_k is a vector of length C. b_k is the +1.
-    for i in range(window_size, H - window_size):
+    phase_1 = []
+    phase_2 = []
+    # Construction of block matrices is expensive, and most submatrices are repeated, so we preconstruct them
+    G = np.vstack((
+        np.hstack((np.zeros((neighbourhood_size, C)), np.ones((neighbourhood_size, 1)))),
+        np.hstack((epsilon ** 0.5 * np.eye(C), np.zeros((C, 1)))),
+    ))
+    bar_alpha_k = np.vstack((
+        np.zeros((neighbourhood_size, 1)),  # row-major
+        np.zeros((C, 1))
+    ))
+    for i in tqdm(range(window_size, H - window_size)):
         for j in range(window_size, W - window_size):
+            start = time.time_ns()
             # NB. The following (window_I) is the matrix A_{(k)} in my proof
             window_I = I[i - window_size:i + window_size + 1, j - window_size:j + window_size + 1, :].reshape((neighbourhood_size, C))  # row-major
             # NB. The following (G) is the matrix G_{(k)} in my proof
-            G = np.block([
-                [window_I, np.ones((neighbourhood_size, 1))],
-                [epsilon ** 0.5 * np.eye(C), np.zeros((C, 1))]
-            ])
+            # G = np.block([
+            #     [window_I, np.ones((neighbourhood_size, 1))],
+            #     [epsilon ** 0.5 * np.eye(C), np.zeros((C, 1))]
+            # ])
+            G[:neighbourhood_size, :C] = window_I
             # NB. The following (bar_alpha_k) is the vector \bar{\alpha}_{(k)} in my proof
-            bar_alpha_k = np.block([
-                [alpha[i - window_size:i + window_size + 1, j - window_size:j + window_size + 1].reshape(neighbourhood_size, 1)],  # row-major
-                [np.zeros((C, 1))]
-            ])
+            # bar_alpha_k = np.block([
+            #     [alpha[i - window_size:i + window_size + 1, j - window_size:j + window_size + 1].reshape(neighbourhood_size, 1)],  # row-major
+            #     [np.zeros((C, 1))]
+            # ])
+            bar_alpha_k[:neighbourhood_size, :] = alpha[i - window_size:i + window_size + 1, j - window_size:j + window_size + 1].reshape(neighbourhood_size, 1)  # row-major
             # NB. The following RHS expression (before reshaping) is the block vector $[ \hat{a}_k & \hat{b}_k ]^T$ in my proof
-            result[i, j, :] = (np.linalg.inv(G.T @ G) @ G.T @ bar_alpha_k).reshape(1, 1, C + 1)
+            mid = time.time_ns()
+            result[i, j, :] = (splinalg.inv(G.T @ G, check_finite=False) @ G.T @ bar_alpha_k).reshape(1, 1, C + 1)
+            end = time.time_ns()
+            phase_1.append(mid-start)
+            phase_2.append(end-mid)
+    print(f"phase 1 took {np.mean(phase_1)}")
+    print(f"phase 2 took {np.mean(phase_2)}")
     # The following broadcasting nuance is courtesy of https://stackoverflow.com/questions/3551242/numpy-index-slice-without-losing-dimension-information#comment90059776_18183182
     result[:window_size, :, :] = result[[window_size], :, :]  # TODO why not calculate normally with "zero-padding" idea?
     result[-window_size:, :, :] = result[[-window_size - 1], :, :]  # TODO why not calculate normally with "zero-padding" idea?
@@ -78,6 +102,7 @@ def upsample_alpha_using_image(downsampled_alpha, downsampled_I, I, epsilon, win
     result = np.sum(linear_coefficients[:, :, :-1] * I, axis=2) + linear_coefficients[:, :, -1]
 
     assert result.dtype == float
+    print("upsample_alpha_using_image returning")
     return result
 
 

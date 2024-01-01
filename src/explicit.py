@@ -2,8 +2,10 @@ import numpy as np
 import numpy.matlib as npmatlib
 import scipy.ndimage as spndimage
 import scipy.sparse as spsparse
-from scipy.sparse.linalg import spsolve
+from scipy import linalg as splinalg
 from sksparse.cholmod import cholesky
+
+# from scipy.sparse.linalg import spsolve  # fallback if cholesky doesn't work
 
 
 def get_laplacian(I, constrained_map, epsilon, window_size):
@@ -45,7 +47,7 @@ def get_laplacian(I, constrained_map, epsilon, window_size):
             # NB. The following (window_mu) is the vector \mu_{(k)} in my proof
             window_mu = np.mean(window_I, axis=0).reshape(-1, 1)  # sum columns; C x 1 vector
             # NB. The following (window_var) is the matrix (\Sigma_{(k)} + \frac{\epsilon}{M^2} I_{CxC})^{-1} in my proof
-            window_var = np.linalg.inv((window_I.T @ window_I) / neighbourhood_size - window_mu @ window_mu.T + epsilon / neighbourhood_size * np.eye(C))
+            window_var = splinalg.inv((window_I.T @ window_I) / neighbourhood_size - window_mu @ window_mu.T + epsilon / neighbourhood_size * np.eye(C))
             window_I = window_I - npmatlib.repmat(window_mu.T, neighbourhood_size, 1)
             # NB. The following (temp_vals) is the 1/M^2 * (1 + (...)^T (...)^{-1} scalar term for (k)
             # to be used in the computation of Laplacian matrix elements for all M^2 x M^2 possible
@@ -89,8 +91,8 @@ def solve_alpha_explicit(I, constrained_map, constrained_vals, epsilon, window_s
     lagrangian_lambda = 100
     A = L + lagrangian_lambda * D
     b = lagrangian_lambda * (constrained_map * constrained_vals).flatten()
-    # alpha = cholesky(A)(b)  # HW x 1 vector
-    alpha = spsolve(A, b)  # HW x 1 vector
+    alpha = cholesky(A)(b)  # HW x 1 vector
+    # alpha = spsolve(A, b)  # HW x 1 vector
     alpha = np.clip(alpha, 0, 1).reshape((H, W))  # TODO: why is clipping necessary?
 
     assert alpha.dtype == float
