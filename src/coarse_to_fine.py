@@ -1,9 +1,11 @@
 import numpy as np
 import numpy.matlib as npmatlib
 import scipy.ndimage as spndimage
+import skimage
 
-from .. import sampling, utils
-from .explicit import solve_alpha_explicit
+import explicit
+import sampling
+import utils
 
 
 def get_linear_coefficients(alpha, I, epsilon, window_size):
@@ -28,11 +30,9 @@ def get_linear_coefficients(alpha, I, epsilon, window_size):
     """
     neighbourhood_size = (1 + 2 * window_size) ** 2  # this is neb_size in MATLAB
     H, W, C = I.shape
-    indices = np.arange(H * W).reshape((H, W))  # row-major
     result = np.zeros((H, W, C + 1))  # a_k is a vector of length C. b_k is the +1.
     for i in range(window_size, H - window_size):
         for j in range(window_size, W - window_size):
-            window_indices = indices[i - window_size:i + window_size + 1, j - window_size:j + window_size + 1].flatten()  # row-major
             # NB. The following (window_I) is the matrix A_{(k)} in my proof
             window_I = I[i - window_size:i + window_size + 1, j - window_size:j + window_size + 1, :].reshape((neighbourhood_size, C))  # row-major
             # NB. The following (G) is the matrix G_{(k)} in my proof
@@ -42,15 +42,16 @@ def get_linear_coefficients(alpha, I, epsilon, window_size):
             ])
             # NB. The following (bar_alpha_k) is the vector \bar{\alpha}_{(k)} in my proof
             bar_alpha_k = np.block([
-                [alpha[window_indices]],  # row-major
+                [alpha[i - window_size:i + window_size + 1, j - window_size:j + window_size + 1].reshape(-1, 1)],  # row-major
                 [np.zeros((C, 1))]
             ])
             # NB. The following RHS expression (before reshaping) is the block vector $[ \hat{a}_k & \hat{b}_k ]^T$ in my proof
             result[i, j, :] = (np.linalg.inv(G.T @ G) @ G.T @ bar_alpha_k).reshape(1, 1, -1)
-    result[:window_size, :, :] = npmatlib.repmat(result[window_size, :, :], window_size, 1)  # TODO why not calculate normally with "zero-padding" idea?
-    result[-window_size:, :, :] = npmatlib.repmat(result[-window_size - 1, :, :], window_size, 1)  # TODO why not calculate normally with "zero-padding" idea?
-    result[:, :window_size, :] = npmatlib.repmat(result[:, window_size, :], 1, window_size)  # TODO why not calculate normally with "zero-padding" idea?
-    result[:, -window_size:, :] = npmatlib.repmat(result[:, -window_size - 1, :], 1, window_size)  # TODO why not calculate normally with "zero-padding" idea?
+    # The following broadcasting nuance is courtesy of https://stackoverflow.com/questions/3551242/numpy-index-slice-without-losing-dimension-information#comment90059776_18183182
+    result[:window_size, :, :] = result[[window_size], :, :]  # TODO why not calculate normally with "zero-padding" idea?
+    result[-window_size:, :, :] = result[[-window_size - 1], :, :]  # TODO why not calculate normally with "zero-padding" idea?
+    result[:, :window_size, :] = result[:, [window_size], :]  # TODO why not calculate normally with "zero-padding" idea?
+    result[:, -window_size:, :] = result[:, [-window_size - 1], :]  # TODO why not calculate normally with "zero-padding" idea?
     return result
 
 
@@ -62,11 +63,12 @@ def upsample_alpha_using_image(downsampled_alpha, downsampled_I, I, epsilon, win
 
     Returns: H x W array
     """
+    print("upsample_alpha_using_image invoked")
     downsampled_linear_coefficients = get_linear_coefficients(downsampled_alpha, downsampled_I, epsilon, window_size)  # ceil((H - 2 * antialiasing_filter_size) / 2) x ceil((W - 2 * antialiasing_filter_size) / 2) x (C + 1) array
     linear_coefficients = sampling.upsample_image(downsampled_linear_coefficients, I.shape[0], I.shape[1])  # this is bcoeff in MATLAB code; H x W x (C + 1) array\
 
     # Using equation $\forall i. \alpha_i = a_i^T I_i + b_i$ where a_i, I_i are vectors and b_i is scalar
-    return linear_coefficients[:, :, :-1] * I + linear_coefficients[:, :, -1]
+    return np.sum(linear_coefficients[:, :, :-1] * I, axis=2) + linear_coefficients[:, :, -1]
 
 
 def solve_alpha_coarse_to_fine(
@@ -86,6 +88,7 @@ def solve_alpha_coarse_to_fine(
 
     Returns: H x W array
     """
+    print(f"[fineness {levels_count}] solve_alpha_coarse_to_fine invoked")
 
     erode_mask_size = 1  # TODO shouldn't this be equal to window_size?
     if levels_count >= 2:
@@ -96,6 +99,11 @@ def solve_alpha_coarse_to_fine(
         downsampled_constrained_vals = np.round(
             sampling.downsample_image(utils.ensure_3d_image(constrained_vals), antialiasing_filter_size=2).squeeze()
         )  # ceil((H - 2 * antialiasing_filter_size) / 2) x ceil((W - 2 * antialiasing_filter_size) / 2) array
+
+        print(f"[fineness {levels_count}] displaying downsampled_constrained_map")
+        skimage.io.imshow(downsampled_constrained_map)  # TODO: remove
+        skimage.io.show()  # TODO: remove
+
         downsampled_alpha = solve_alpha_coarse_to_fine(
             downsampled_I,  # ceil((H - 2 * antialiasing_filter_size) / 2) x ceil((W - 2 * antialiasing_filter_size) / 2) x C array
             downsampled_constrained_map,  # ceil((H - 2 * antialiasing_filter_size) / 2) x ceil((W - 2 * antialiasing_filter_size) / 2) array
@@ -106,6 +114,11 @@ def solve_alpha_coarse_to_fine(
             epsilon,
             window_size
         )  # ceil((H - 2 * antialiasing_filter_size) / 2) x ceil((W - 2 * antialiasing_filter_size) / 2) array
+
+        print(f"[fineness {levels_count}] displaying downsampled_alpha")
+        skimage.io.imshow(downsampled_alpha)  # TODO: remove
+        skimage.io.show()  # TODO: remove
+
         alpha = upsample_alpha_using_image(
             downsampled_alpha,  # ceil((H - 2 * antialiasing_filter_size) / 2) x ceil((W - 2 * antialiasing_filter_size) / 2) array
             downsampled_I,  # ceil((H - 2 * antialiasing_filter_size) / 2) x ceil((W - 2 * antialiasing_filter_size) / 2) x C array
@@ -113,6 +126,10 @@ def solve_alpha_coarse_to_fine(
             epsilon,
             window_size
         )  # H x W array
+
+        print(f"[fineness {levels_count}] displaying (upsampled) alpha")
+        skimage.io.imshow(alpha)  # TODO: remove
+        skimage.io.show()  # TODO: remove
 
         # The following are only used if levels_count <= explicit_alpha_levels_count later
         temp_alpha = alpha * (1 - constrained_map) + constrained_vals  # enforce scribbled alphas
@@ -123,17 +140,22 @@ def solve_alpha_coarse_to_fine(
         constrained_map = np.minimum(
             1,
             constrained_map \
-                + spndimage.binary_erosion(alpha >= 1 - alpha_threshold, np.ones(1 + 2 * erode_mask_size)) \
-                + spndimage.binary_erosion(alpha <= alpha_threshold, np.ones(1 + 2 * erode_mask_size))
+                + spndimage.binary_erosion(alpha >= 1 - alpha_threshold, np.ones((1 + 2 * erode_mask_size, 1 + 2 * erode_mask_size))) \
+                + spndimage.binary_erosion(alpha <= alpha_threshold, np.ones((1 + 2 * erode_mask_size, 1 + 2 * erode_mask_size)))
         )
         constrained_vals = constrained_map * temp_alpha
 
     if levels_count <= explicit_alpha_levels_count:
-        alpha = solve_alpha_explicit(
+        print(f"[fineness {levels_count}] EXPLICIT RUNNING")
+        alpha = explicit.solve_alpha_explicit(
             I,  # H x W x C array
             constrained_map,  # H x W array
             constrained_vals,  # H x W array
             epsilon,
             window_size
         )
+    print(f"    [fineness {levels_count}] solve_alpha_coarse_to_fine returning... (displaying)")
+    skimage.io.imshow(alpha)
+    skimage.io.show()
+    print(f"    [fineness {levels_count}] solve_alpha_coarse_to_fine returned")
     return alpha

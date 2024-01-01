@@ -16,7 +16,7 @@ def downsample_image(I, antialiasing_filter_size):
     filter = np.array([1, 2, 1]) / 4 if antialiasing_filter_size == 1 else np.array([1, 4, 6, 4, 1]) / 16
     I = spndimage.convolve1d(I, filter, axis=0, mode="constant")
     I = spndimage.convolve1d(I, filter, axis=1, mode="constant")
-    return I[antialiasing_filter_size:2:-antialiasing_filter_size, antialiasing_filter_size:2:-antialiasing_filter_size, :]
+    return I[antialiasing_filter_size:-antialiasing_filter_size:2, antialiasing_filter_size:-antialiasing_filter_size:2, :]
 
 
 def upsample_image(I, new_H, new_W, reconstruction_filter_size=1):
@@ -57,26 +57,11 @@ def upsample_image(I, new_H, new_W, reconstruction_filter_size=1):
     ] = I
 
     # Perform copy-padding (instead of zero-padding) for upsampling (interpolation) purposes
-    result[reconstruction_filter_size + top_strip_height - 2::-2, :, :] = npmatlib.repmat(
-        result[reconstruction_filter_size + top_strip_height, :, :],
-        math.ceil((reconstruction_filter_size + top_strip_height - 1) / 2),
-        1
-    )  # repeat first row of downsampled pixels upwards for interpolation purposes
-    result[-reconstruction_filter_size - bottom_strip_height + 1::2, :, :] = npmatlib.repmat(
-        result[-reconstruction_filter_size - bottom_strip_height - 1, :, :],
-        math.ceil((reconstruction_filter_size + bottom_strip_height - 1) / 2),
-        1
-    )  # repeat last row of downsampled pixels downwards for interpolation purposes
-    result[:, reconstruction_filter_size + left_strip_width - 2::-2, :] = npmatlib.repmat(
-        result[:, reconstruction_filter_size + left_strip_width, :],
-        1,
-        math.ceil((reconstruction_filter_size + left_strip_width - 1) / 2),
-    )  # repeat first column of downsampled pixels leftwards for interpolation purposes
-    result[:, -reconstruction_filter_size - right_strip_width + 1::-2, :] = npmatlib.repmat(
-        result[:, -reconstruction_filter_size - right_strip_width - 1, :],
-        1,
-        math.ceil((reconstruction_filter_size + right_strip_width - 1) / 2),
-    )  # repeat last column of downsampled pixels right for interpolation purposes
+    # The following broadcasting nuance is courtesy of https://stackoverflow.com/questions/3551242/numpy-index-slice-without-losing-dimension-information#comment90059776_18183182
+    result[reconstruction_filter_size + top_strip_height - 2::-2, :, :] = result[[reconstruction_filter_size + top_strip_height], :, :]  # repeat first row of downsampled pixels upwards for interpolation purposes
+    result[-reconstruction_filter_size - bottom_strip_height + 1::2, :, :] = result[[-reconstruction_filter_size - bottom_strip_height - 1], :, :]  # repeat last row of downsampled pixels downwards for interpolation purposes
+    result[:, reconstruction_filter_size + left_strip_width - 2::-2, :] = result[:, [reconstruction_filter_size + left_strip_width], :]  # repeat first column of downsampled pixels leftwards for interpolation purposes
+    result[:, -reconstruction_filter_size - right_strip_width + 1::-2, :] = result[:, [-reconstruction_filter_size - right_strip_width - 1], :]  # repeat last column of downsampled pixels right for interpolation purposes
 
     # The actual upsampling via a reconstruction filter
     result = spndimage.convolve1d(result, reconstruction_filter, axis=0, mode="constant")
