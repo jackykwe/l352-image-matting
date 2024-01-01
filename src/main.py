@@ -1,5 +1,5 @@
 import argparse
-import os
+import logging
 
 import numpy as np
 import skimage
@@ -7,12 +7,17 @@ import skimage
 import closedform.coarse_to_fine
 import closedform.utils
 
+# python3 src/main.py -v closedform -i datasets/input_training_lowres/GT01.png -s datasets/input_training_lowres/GT01-scribble.png -l 4 -L 2
+# python3 src/main.py -v closedform -i matlab/peacock.bmp -s matlab/peacock_m.bmp -l 4 -L 2
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         prog="L352 Mini-Project",
         description="Perform alpha matting on given inputs",
         epilog="jwek2",
     )
+    parser.add_argument("-v", "--verbose", action="count", help="Enable logging, maximum twice", default=0)
     subparsers = parser.add_subparsers(dest="subcommand", title="subcommands", help="additional help", required=True)
 
     closed_form_parser = subparsers.add_parser("closedform")
@@ -20,29 +25,26 @@ if __name__ == "__main__":
     closed_form_parser.add_argument("-s", "--scribble-path", type=str, help="Path to scribble", required=True)
     closed_form_parser.add_argument("-a", "--alpha-threshold", type=int, default=0.02, help="Alpha values within this close to 0 and 1 are pushed to 0 and 1 respectively (default: %(default)s)")
     closed_form_parser.add_argument("-e", "--epsilon", type=int, default=1e-7, help="Epsilon parameter (default: %(default)s)")
-    closed_form_parser.add_argument("-w", "--window-size", choices=(1, 2), default=1, help="One-sided window size. 1 means 3x3 window. 2 means 5x5 window. (default: %(default)s)")
-    closed_form_parser.add_argument("-l", "--levels-count", default=4, help="Number of layers in coarse-to-fine pyramid, with each coarser layer downsampled from the previous by a factor of 2 (default: %(default)s)")
-    closed_form_parser.add_argument("-L", "--explicit-alpha-levels-count", default=2, help="Number of coarsest levels to explicitly calculate alphas; the finer (levels_count - explicit_alpha_levels_count) levels will not solve for the Laplacian directly but interpolate linear coefficients to derive alpha. Require that active_levels_num <= levels_num. (default: %(default)s)")
+    closed_form_parser.add_argument("-w", "--window-size", type=int, choices=(1, 2), default=1, help="One-sided window size. 1 means 3x3 window. 2 means 5x5 window. (default: %(default)s)")
+    closed_form_parser.add_argument("-l", "--levels-count", type=int, default=4, help="Number of layers in coarse-to-fine pyramid, with each coarser layer downsampled from the previous by a factor of 2 (default: %(default)s)")
+    closed_form_parser.add_argument("-L", "--explicit-alpha-levels-count", type=int, default=2, help="Number of coarsest levels to explicitly calculate alphas; the finer (levels_count - explicit_alpha_levels_count) levels will not solve for the Laplacian directly but interpolate linear coefficients to derive alpha. Require that active_levels_num <= levels_num. (default: %(default)s)")
 
     robust_parser = subparsers.add_parser("robust")
-    robust_parser.add_argument("-i", "--image-path", help="Path to original image", required=True)
-    robust_parser.add_argument("-t", "--trimap-path", help="Path to trimap")
+    robust_parser.add_argument("-i", "--image-path", type=str, help="Path to original image", required=True)
+    robust_parser.add_argument("-t", "--trimap-path", type=str, help="Path to trimap")
 
     args = parser.parse_args()
-    print(args)
+    if args.verbose == 1:
+        logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", datefmt="%y%m%d %H%M%S", level=logging.INFO)
+    elif args.verbose > 1:
+        logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", datefmt="%y%m%d %H%M%S", level=logging.DEBUG)
 
     if args.subcommand == "closedform":
-        # image_name = "GT01.png"
-        # image_path = os.path.join("datasets", "input_training_lowres", image_name)
-        # image_name = "peacock.bmp"
-        # image_path = os.path.join("matlab", image_name)
+        logging.info(f"Opening {args.image_path}")
         I = skimage.io.imread(args.image_path) / 255
         I = closedform.utils.ensure_3d_image(I)  # H x W x C array
 
-        # scribble_image_name = "GT01-scribble.png"
-        # scribble_image_path = os.path.join("datasets", "input_training_lowres", scribble_image_name)
-        # scribble_image_name = "peacock_m.bmp"
-        # scribble_image_path = os.path.join("matlab", scribble_image_name)
+        logging.info(f"Opening {args.scribble_path}")
         I_scribble = skimage.io.imread(args.scribble_path) / 255 # this is mI in MATLAB code
         assert I_scribble.shape == I.shape, f"Shapes of scribble image ({I_scribble.shape}) and image ({I.shape}) don't match"
         I_scribble_gray2D = closedform.utils.matlab_compatible_rgb2gray(I_scribble) if I.shape[2] == 3 else I_scribble  # H x W array

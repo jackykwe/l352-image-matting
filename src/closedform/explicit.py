@@ -91,7 +91,7 @@ def solve_alpha_explicit(I, constrained_map, constrained_vals, epsilon, window_s
     lagrangian_lambda = 100
     A = L + lagrangian_lambda * D
     b = lagrangian_lambda * (constrained_map * constrained_vals).flatten()
-    alpha = cholesky(A)(b)  # HW x 1 vector
+    alpha = cholesky(A.tocsc())(b)  # HW x 1 vector
     # alpha = spsolve(A, b)  # HW x 1 vector
     alpha = np.clip(alpha, 0, 1).reshape((H, W))  # TODO: why is clipping necessary?
 
