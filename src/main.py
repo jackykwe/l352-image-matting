@@ -1,64 +1,70 @@
+import argparse
 import os
 
 import numpy as np
 import skimage
 
-import utils
-from coarse_to_fine import solve_alpha_coarse_to_fine
+import closedform.coarse_to_fine
+import closedform.utils
 
 if __name__ == "__main__":
-    alpha_threshold = 0.05
-    epsilon = 1e-7
-    window_size = 1  # or 2
-    assert (1 + 2 * window_size) % 2 != 0, f"M = (1 + 2 * window_size) should be even, got M = {1 + 2 * window_size}"
+    parser = argparse.ArgumentParser(
+        prog="L352 Mini-Project",
+        description="Perform alpha matting on given inputs",
+        epilog="jwek2",
+    )
+    subparsers = parser.add_subparsers(dest="subcommand", title="subcommands", help="additional help", required=True)
 
-    levels_count = 4
-    explicit_alpha_levels_count = 2
-    # use active_levels_num<=levels_num.
-    # If active_levels_num<levels_num then in the finer resolutions alpha is not computed explicitly.
-    # Instead the linear coefficients of the coarser resolution are interpolated.
+    closed_form_parser = subparsers.add_parser("closedform")
+    closed_form_parser.add_argument("-i", "--image-path", type=str, help="Path to original image", required=True)
+    closed_form_parser.add_argument("-s", "--scribble-path", type=str, help="Path to scribble", required=True)
+    closed_form_parser.add_argument("-a", "--alpha-threshold", type=int, default=0.02, help="Alpha values within this close to 0 and 1 are pushed to 0 and 1 respectively (default: %(default)s)")
+    closed_form_parser.add_argument("-e", "--epsilon", type=int, default=1e-7, help="Epsilon parameter (default: %(default)s)")
+    closed_form_parser.add_argument("-w", "--window-size", choices=(1, 2), default=1, help="One-sided window size. 1 means 3x3 window. 2 means 5x5 window. (default: %(default)s)")
+    closed_form_parser.add_argument("-l", "--levels-count", default=4, help="Number of layers in coarse-to-fine pyramid, with each coarser layer downsampled from the previous by a factor of 2 (default: %(default)s)")
+    closed_form_parser.add_argument("-L", "--explicit-alpha-levels-count", default=2, help="Number of coarsest levels to explicitly calculate alphas; the finer (levels_count - explicit_alpha_levels_count) levels will not solve for the Laplacian directly but interpolate linear coefficients to derive alpha. Require that active_levels_num <= levels_num. (default: %(default)s)")
 
-    # image_name = "GT01.png"
-    # image_path = os.path.join("datasets", "input_training_lowres", image_name)
-    image_name = "peacock.bmp"
-    image_path = os.path.join("matlab", image_name)
-    I = skimage.io.imread(image_path) / 255
-    I = utils.ensure_3d_image(I)  # H x W x C array
+    robust_parser = subparsers.add_parser("robust")
+    robust_parser.add_argument("-i", "--image-path", help="Path to original image", required=True)
+    robust_parser.add_argument("-t", "--trimap-path", help="Path to trimap")
 
-    # scribble_image_name = "GT01-scribble.png"
-    # scribble_image_path = os.path.join("datasets", "input_training_lowres", scribble_image_name)
-    scribble_image_name = "peacock_m.bmp"
-    scribble_image_path = os.path.join("matlab", scribble_image_name)
-    I_scribble = skimage.io.imread(scribble_image_path) / 255 # this is mI in MATLAB code
-    assert I_scribble.shape == I.shape, f"Shapes of scribble image ({I_scribble.shape}) and image ({I.shape}) don't match"
-    I_scribble_gray2D = utils.matlab_compatible_rgb2gray(I_scribble) if I.shape[2] == 3 else I_scribble  # HxW array
-    I_scribble = utils.ensure_3d_image(I_scribble)  # H x W x C array
+    args = parser.parse_args()
+    print(args)
 
-    # constrained_X are always 2D arrays, not 3D
-    constrained_map = (np.sum(np.absolute(I - I_scribble), axis=2) > 1e-3).astype(float)  # this is consts_map in MATLAB; HxW array
-    constrained_vals = I_scribble_gray2D * constrained_map  # NB. * is the element-wise multiply operator; HxW array
+    if args.subcommand == "closedform":
+        # image_name = "GT01.png"
+        # image_path = os.path.join("datasets", "input_training_lowres", image_name)
+        # image_name = "peacock.bmp"
+        # image_path = os.path.join("matlab", image_name)
+        I = skimage.io.imread(args.image_path) / 255
+        I = closedform.utils.ensure_3d_image(I)  # H x W x C array
 
-    alpha = solve_alpha_coarse_to_fine(
-        I,
-        constrained_map,
-        constrained_vals,
-        levels_count,
-        explicit_alpha_levels_count,
-        alpha_threshold,
-        epsilon,
-        window_size
-    )  # H x W array
+        # scribble_image_name = "GT01-scribble.png"
+        # scribble_image_path = os.path.join("datasets", "input_training_lowres", scribble_image_name)
+        # scribble_image_name = "peacock_m.bmp"
+        # scribble_image_path = os.path.join("matlab", scribble_image_name)
+        I_scribble = skimage.io.imread(args.scribble_path) / 255 # this is mI in MATLAB code
+        assert I_scribble.shape == I.shape, f"Shapes of scribble image ({I_scribble.shape}) and image ({I.shape}) don't match"
+        I_scribble_gray2D = closedform.utils.matlab_compatible_rgb2gray(I_scribble) if I.shape[2] == 3 else I_scribble  # H x W array
+        I_scribble = closedform.utils.ensure_3d_image(I_scribble)  # H x W x C array
 
-    print(f"[TOP LEVEL DONE] alpha before clip")
-    print(f"[TOP LEVEL DONE] np.min(alpha) = {np.min(alpha)}")
-    print(f"[TOP LEVEL DONE] np.max(alpha) = {np.max(alpha)}")
-    skimage.io.imshow(alpha)
-    skimage.io.show()
+        constrained_map = (np.sum(np.absolute(I - I_scribble), axis=2) > 1e-3).astype(float)  # this is consts_map in MATLAB; H x W array
+        constrained_vals = I_scribble_gray2D * constrained_map  # NB. * is the element-wise multiply operator; H x W array
 
-    # alpha = np.clip(alpha, 0, 1)
-
-    # print(f"[TOP LEVEL DONE] alpha after clip")
-    # print(f"[TOP LEVEL DONE] np.min(alpha) = {np.min(alpha)}")
-    # print(f"[TOP LEVEL DONE] np.max(alpha) = {np.max(alpha)}")
-    # skimage.io.imshow(alpha)
-    # skimage.io.show()
+        alpha = closedform.coarse_to_fine.solve_alpha_coarse_to_fine(
+            I,
+            constrained_map,
+            constrained_vals,
+            args.levels_count,
+            args.explicit_alpha_levels_count,
+            args.alpha_threshold,
+            args.epsilon,
+            args.window_size
+        )  # H x W array
+        # alpha = np.clip(alpha, 0, 1)
+        skimage.io.imshow(alpha)
+        skimage.io.show()
+    elif args.subcommand == "robust":
+        raise NotImplementedError
+    else:
+        raise NotImplementedError
