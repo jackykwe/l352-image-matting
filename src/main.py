@@ -6,10 +6,14 @@ import skimage
 
 import closedform.coarse_to_fine
 import closedform.utils
+import robust.entry
 
 # python3 src/main.py -v closedform -i datasets/input_training_lowres/GT01.png -s datasets/input_training_lowres/GT01-scribble.png -l 4 -L 2
 # python3 src/main.py -v closedform -i matlab/peacock.bmp -s matlab/peacock_m.bmp -l 4 -L 2
 
+# Trimap1 is finer.
+# Trimap2 is coarser.
+# python3 src/main.py -v robust -i datasets/input_training_lowres/GT01.png -t datasets/trimap_training_lowres/Trimap1/GT01.png
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -67,6 +71,34 @@ if __name__ == "__main__":
         skimage.io.imshow(alpha)
         skimage.io.show()
     elif args.subcommand == "robust":
-        raise NotImplementedError
+        logging.info(f"Opening {args.image_path}")
+        I = skimage.io.imread(args.image_path) / 255
+        I = closedform.utils.ensure_3d_image(I)  # H x W x C array
+
+        logging.info(f"Opening {args.trimap_path}")
+        I_trimap = skimage.io.imread(args.trimap_path) / 255 # this is mI in MATLAB code
+        assert I_trimap.shape == I.shape, f"Shapes of trimap image ({I_trimap.shape}) and image ({I.shape}) don't match"
+        I_trimap_gray2D = closedform.utils.matlab_compatible_rgb2gray(I_trimap) if I.shape[2] == 3 else I_trimap  # H x W array
+
+        foreground_map = np.absolute(I_trimap_gray2D - 1) < 1e-3  # H x W bool array
+        background_map = np.absolute(I_trimap_gray2D) < 1e-3  # H x W bool array
+        unknown_map = np.ones(I_trimap_gray2D.shape, dtype=bool) ^ (foreground_map | background_map)  # H x W bool array
+
+        # skimage.io.imshow(foreground_map)
+        # skimage.io.show()
+        # skimage.io.imshow(background_map)
+        # skimage.io.show()
+        # skimage.io.imshow(unknown_map)
+        # skimage.io.show()
+
+        alpha = robust.entry.solve_alpha(
+            I,
+            foreground_map,
+            background_map,
+            unknown_map
+        )  # H x W array
+        # alpha = np.clip(alpha, 0, 1)
+        skimage.io.imshow(alpha)
+        skimage.io.show()
     else:
         raise NotImplementedError
