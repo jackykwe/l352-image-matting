@@ -142,11 +142,7 @@ def get_samples(
     ```
     (
         foreground_samples_count x C float array,  (foreground pixel values)
-        1D foreground_samples_count int array,    (foreground pixel x-coordinates)
-        1D foreground_samples_count int array,    (foreground pixel y-coordinates)
         background_samples_count x C float array,  (background pixel values)
-        1D background_samples_count int array,    (background pixel x-coordinates)
-        1D background_samples_count int array,    (background pixel y-coordinates)
     )
     ```
 
@@ -226,12 +222,10 @@ def penalty_distance_ratio_squared(c, f, b):
     squared in equation (6) in the paper.
     """
     f_minus_b = f - b
-    projected_c = b + np.dot(c - b, f_minus_b) * (f_minus_b) / np.dot(f_minus_b, f_minus_b)  # project c onto line between f and b
-    numerator = c - projected_c
-    numerator = np.dot(numerator, numerator)  # NB. no square root is done
-    denominator = f - b
-    denominator = np.dot(denominator, denominator)  # NB. no square root is done
-    return numerator / (denominator + DIVISION_EPSILON)
+    f_minus_b_squared = np.dot(f_minus_b, f_minus_b) + DIVISION_EPSILON
+    c_minus_b = c - b
+    c_minus_projected_c = c_minus_b - f_minus_b * np.dot(c_minus_b, f_minus_b) / f_minus_b_squared  # project c onto line between f and b
+    return np.dot(c_minus_projected_c, c_minus_projected_c) / f_minus_b_squared  # NB. no square root is done for both numerator and denominator
 
 
 def estimate_alpha(c, f, b):
@@ -252,8 +246,8 @@ def solve_alpha(
         foreground_map,
         background_map,
         unknown_map,
-        foreground_samples_count=20,
-        background_samples_count=20,
+        foreground_samples_count=1,
+        background_samples_count=1,
         sigma_squared=0.01,
         highest_confidence_pairs_to_select=3
     ):
@@ -284,8 +278,8 @@ def solve_alpha(
         desc="Obtaining pixel samples and confidences for each unknown pixel",
         disable=not logging.root.isEnabledFor(logging.INFO)
     ):
-        c = I[unknown_i, unknown_j]
-        foreground_samples, background_samples = get_samples(
+        cT = I[unknown_i, unknown_j]
+        FiT, BjT = get_samples(
             I,
             foreground_boundary_is,
             foreground_boundary_js,
@@ -298,29 +292,31 @@ def solve_alpha(
             foreground_samples_count,
             background_samples_count,
             scheme_config={"name": "deterministic_spread"}
-        )
-        penalty_foreground_exparg = foreground_samples - c
-        penalty_foreground_exparg = np.sum(penalty_foreground_exparg * penalty_foreground_exparg, axis=1)
-        penalty_foreground_exparg = -penalty_foreground_exparg / (np.min(penalty_foreground_exparg) + DIVISION_EPSILON)  # this is dividing by D_F^2
-        penalty_background_exparg = background_samples - c
-        penalty_background_exparg = np.sum(penalty_background_exparg * penalty_background_exparg, axis=1)
-        penalty_background_exparg = -penalty_background_exparg / (np.min(penalty_background_exparg) + DIVISION_EPSILON) # this is dividing by D_B^2
+        )  # foreground_samples_count x C float array, background_samples_count x C float array
+
+        # Names now in 2D world (what we are familiar with)
+        cT_minus_FiT = cT - FiT  # foreground_samples_count x C float array
+        cT_minus_FiT_squared = np.sum(cT_minus_FiT * cT_minus_FiT, axis=1)  # 1D length-foreground_samples_count float array
+        penalty_foreground_exparg = -cT_minus_FiT_squared / (np.min(cT_minus_FiT_squared) + DIVISION_EPSILON)  # this is dividing by D_F^2;  # 1D length-foreground_samples_count float array
+        cT_minus_BjT = cT - BjT   # background_samples_count x C float array
+        cT_minus_BjT_squared = np.sum(cT_minus_BjT * cT_minus_BjT, axis=1)  # 1D length-background_samples_count float array
+        penalty_background_exparg = -cT_minus_BjT_squared / (np.min(cT_minus_BjT_squared) + DIVISION_EPSILON)  # this is dividing by D_F^2;  # 1D length-foreground_samples_count float array
 
         foreground_sample_i_background_sample_j_pairs = np.array(list(
             itertools.product(range(foreground_samples_count), range(background_samples_count))
         ))
         confidences = []
         for foreground_sample_i, background_sample_j in foreground_sample_i_background_sample_j_pairs:
-            f = foreground_samples[foreground_sample_i]
-            b = background_samples[background_sample_j]
+            f = FiT[foreground_sample_i]
+            b = BjT[background_sample_j]
             # scalar. np.exp() is not performed as it doesn't affect ranking, and exponentiating causes many confidences to be clamped to 1 due to imprecision, which hinders sorting
-            confidence = -penalty_distance_ratio_squared(c, f, b) * math.exp(penalty_foreground_exparg[foreground_sample_i] + penalty_background_exparg[background_sample_j]) #  / sigma_squared  # doesn't affect ranking
+            confidence = -penalty_distance_ratio_squared(cT, f, b) * math.exp(penalty_foreground_exparg[foreground_sample_i] + penalty_background_exparg[background_sample_j]) #  / sigma_squared  # doesn't affect ranking
             confidences.append(confidence)
         confidences = np.array(confidences)
         highest_confidence_argsort = np.argsort(confidences)[-highest_confidence_pairs_to_select:]
         estimated_alphas = []  # only the highest_confidence_pairs_to_select most confident ones
         for foreground_sample_i, background_sample_j in foreground_sample_i_background_sample_j_pairs[highest_confidence_argsort]:
-            estimated_alphas.append(estimate_alpha(c, foreground_samples[foreground_sample_i], background_samples[background_sample_j]))
+            estimated_alphas.append(estimate_alpha(cT, FiT[foreground_sample_i], BjT[background_sample_j]))
 
         result[unknown_i, unknown_j] = np.average(estimated_alphas, weights=np.exp(confidences[highest_confidence_argsort]))  # TODO: weighted average hm
 
