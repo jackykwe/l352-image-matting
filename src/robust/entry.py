@@ -248,7 +248,6 @@ def solve_alpha(
         unknown_map,
         foreground_samples_count=20,
         background_samples_count=20,
-        sigma_squared=0.01,
         highest_confidence_pairs_to_select=3
     ):
     """
@@ -268,7 +267,7 @@ def solve_alpha(
     foreground_boundary_pixels = I[foreground_boundary_is, foreground_boundary_js]  # slow! do not do in a loop
     background_boundary_pixels = I[background_boundary_is, background_boundary_js]  # slow! do not do in a loop
 
-    result = np.zeros(I.shape, dtype=float)
+    result = np.zeros(I.shape[:2], dtype=float)
     result[foreground_map] = 1
 
     # try parallelise the below.
@@ -278,48 +277,6 @@ def solve_alpha(
         desc="Obtaining pixel samples and confidences for each unknown pixel",
         disable=not logging.root.isEnabledFor(logging.INFO)
     ):
-        ### METHOD 1
-
-        cT = I[unknown_i, unknown_j]
-        FiT, BjT = get_samples(
-            I,
-            foreground_boundary_is,
-            foreground_boundary_js,
-            foreground_boundary_pixels,
-            background_boundary_is,
-            background_boundary_js,
-            background_boundary_pixels,
-            unknown_i,
-            unknown_j,
-            foreground_samples_count,
-            background_samples_count,
-            scheme_config={"name": "deterministic_spread"}
-        )  # foreground_samples_count x C float array, background_samples_count x C float array
-
-        # Names now in 2D world (what we are familiar with)
-        cT_minus_FiT = cT - FiT  # foreground_samples_count x C float array
-        cT_minus_FiT_squared = np.sum(cT_minus_FiT * cT_minus_FiT, axis=1)  # 1D length-foreground_samples_count float array
-        penalty_foreground_exparg = -cT_minus_FiT_squared / (np.min(cT_minus_FiT_squared) + DIVISION_EPSILON)  # this is dividing by D_F^2;  # 1D length-foreground_samples_count float array
-        cT_minus_BjT = cT - BjT   # background_samples_count x C float array
-        cT_minus_BjT_squared = np.sum(cT_minus_BjT * cT_minus_BjT, axis=1)  # 1D length-background_samples_count float array
-        penalty_background_exparg = -cT_minus_BjT_squared / (np.min(cT_minus_BjT_squared) + DIVISION_EPSILON)  # this is dividing by D_F^2;  # 1D length-foreground_samples_count float array
-
-        foreground_sample_i_background_sample_j_pairs = np.array(list(
-            itertools.product(range(foreground_samples_count), range(background_samples_count))
-        ))
-        confidences = []
-        for foreground_sample_i, background_sample_j in foreground_sample_i_background_sample_j_pairs:
-            f = FiT[foreground_sample_i]
-            b = BjT[background_sample_j]
-            # scalar. np.exp() is not performed as it doesn't affect ranking, and exponentiating causes many confidences to be clamped to 1 due to imprecision, which hinders sorting
-            confidence = -penalty_distance_ratio_squared(cT, f, b) * math.exp(penalty_foreground_exparg[foreground_sample_i] + penalty_background_exparg[background_sample_j]) #  / sigma_squared  # doesn't affect ranking
-            confidences.append(confidence)
-        confidences = np.array(confidences)
-
-
-
-        ### /METHOD 1
-        ### METHOD 2
         cT = I[unknown_i, unknown_j]
         FiT, BjT = get_samples(
             I,
@@ -335,52 +292,36 @@ def solve_alpha(
             background_samples_count,
             scheme_config={"name": "deterministic_spread"}
         )
-        t1 = time.time_ns()
         # Names now in 2D world (what we are familiar with)
         cT_minus_FiT = cT - FiT  # foreground_samples_count x C float array
         cT_minus_FiT_squared = np.sum(cT_minus_FiT * cT_minus_FiT, axis=1)  # 1D length-foreground_samples_count float array
         penalty_foreground_exparg = -cT_minus_FiT_squared / (np.min(cT_minus_FiT_squared) + DIVISION_EPSILON)  # this is dividing by D_F^2;  # 1D length-foreground_samples_count float array
-
         cT_minus_BjT = cT - BjT   # background_samples_count x C float array
         cT_minus_BjT_squared = np.sum(cT_minus_BjT * cT_minus_BjT, axis=1)  # 1D length-background_samples_count float array
-        penalty_background_exparg = -cT_minus_BjT_squared / (np.min(cT_minus_BjT_squared) + DIVISION_EPSILON)  # this is dividing by D_F^2;  # 1D length-foreground_samples_count float array
-
-        foreground_sample_i_background_sample_j_pairs = np.array(list(
-            itertools.product(range(foreground_samples_count), range(background_samples_count))
-        ))
-
+        penalty_background_exparg = -cT_minus_BjT_squared / (np.min(cT_minus_BjT_squared) + DIVISION_EPSILON)  # this is dividing by D_B^2;  # 1D length-background_samples_count float array
         penalty_foreground_background = np.exp(np.repeat(penalty_foreground_exparg, background_samples_count) + np.tile(penalty_background_exparg, foreground_samples_count))  # 1D length-(foreground_samples_count * background_samples_count) float array
 
-        t2 = time.time_ns()
         # Names now in 3D
-        stackof_Fi_minus_Bj = (np.repeat(FiT, background_samples_count, axis=0) - np.tile(BjT, (foreground_samples_count, 1)))[:, :, np.newaxis]  # (foreground_samples_count * background_samples_count) x C x 1 float array
-        stackof_FiT_minus_BjT = np.transpose(stackof_Fi_minus_Bj, (0, 2, 1))  # (foreground_samples_count * background_samples_count) x 1 x C float array
-        stackof_Fi_minus_Bj_squared = stackof_FiT_minus_BjT @ stackof_Fi_minus_Bj + DIVISION_EPSILON # (foreground_samples_count * background_samples_count) x 1 x 1 float array
-        stackof_Aij = \
+        Fi_minus_Bj_3D = (np.repeat(FiT, background_samples_count, axis=0) - np.tile(BjT, (foreground_samples_count, 1)))[:, :, np.newaxis]  # (foreground_samples_count * background_samples_count) x C x 1 float array
+        FiT_minus_BjT_3D = np.transpose(Fi_minus_Bj_3D, (0, 2, 1))  # (foreground_samples_count * background_samples_count) x 1 x C float array
+        Fi_minus_Bj_squared_3D = FiT_minus_BjT_3D @ Fi_minus_Bj_3D + DIVISION_EPSILON # (foreground_samples_count * background_samples_count) x 1 x 1 float array
+        alpha_premultiplier_3D = FiT_minus_BjT_3D / Fi_minus_Bj_squared_3D  # this subexpression is named, as it's useful again later when estimating alphas (see estimated_alphas variable)
+        Aij_3D = \
             (
                 np.tile(np.eye(3).reshape(1, 3, 3), (foreground_samples_count * background_samples_count, 1, 1)) \
-                - (stackof_Fi_minus_Bj @ stackof_FiT_minus_BjT) / stackof_Fi_minus_Bj_squared
-            ) / stackof_Fi_minus_Bj_squared  # (foreground_samples_count * background_samples_count) x C x C float array
+                - (Fi_minus_Bj_3D @ alpha_premultiplier_3D)
+            ) / Fi_minus_Bj_squared_3D  # (foreground_samples_count * background_samples_count) x C x C float array
+        c_minus_Bj_3D = np.tile(cT_minus_BjT, (foreground_samples_count, 1))[:, :, np.newaxis] # (foreground_samples_count * background_samples_count) x C x 1 float array
+        cT_minus_BjT_3D = np.transpose(c_minus_Bj_3D, (0, 2, 1))  # (foreground_samples_count * background_samples_count) x 1 x C float array
 
-        stackof_c_minus_Bj = np.tile(cT_minus_BjT, (foreground_samples_count, 1))[:, :, np.newaxis] # (foreground_samples_count * background_samples_count) x C x 1 float array
-        stackof_cT_minus_BjT = np.transpose(stackof_c_minus_Bj, (0, 2, 1))  # (foreground_samples_count * background_samples_count) x 1 x C float array
-        confidences2 = -np.squeeze(stackof_cT_minus_BjT @ stackof_Aij @ stackof_c_minus_Bj) * penalty_foreground_background
+        confidences = -np.squeeze(cT_minus_BjT_3D @ Aij_3D @ c_minus_Bj_3D) * penalty_foreground_background  # 1D length-(foreground_samples_count * background_samples_count) float array
 
-
-        ### /METHOD 2
-        assert np.allclose(confidences, confidences2)
-
-        # highest_confidence_argsort = np.argsort(confidences)[-highest_confidence_pairs_to_select:]
-        # estimated_alphas = []  # only the highest_confidence_pairs_to_select most confident ones
-        # for foreground_sample_i, background_sample_j in foreground_sample_i_background_sample_j_pairs[highest_confidence_argsort]:
-        #     estimated_alphas.append(estimate_alpha(cT, FiT[foreground_sample_i], BjT[background_sample_j]))
-
-        # result[unknown_i, unknown_j] = np.average(estimated_alphas, weights=np.exp(confidences[highest_confidence_argsort]))  # TODO: weighted average hm
-
+        highest_confidence_argsort = np.argsort(confidences)[-highest_confidence_pairs_to_select:]
+        estimated_alphas = (alpha_premultiplier_3D[highest_confidence_argsort, :, :] @ c_minus_Bj_3D[highest_confidence_argsort, :, :]).squeeze()  # 1D length-(highest_confidence_pairs_to_select) float array
+        result[unknown_i, unknown_j] = np.average(estimated_alphas, weights=np.exp(confidences[highest_confidence_argsort]))
 
     result = np.clip(result, 0, 1)  # there tends to be some alphas that lie outside of [0, 1]...
     # np.save("helpme.npy", result)
-
     # result = np.load("helpme.npy")
     skimage.io.imshow(result)
     skimage.io.show()
