@@ -1,13 +1,14 @@
 import itertools
 import logging
+import math
 import time
 
 import numpy as np
-import scipy as sp
 import scipy.ndimage as spndimage
 import skimage
 from tqdm.auto import tqdm
 
+DIVISION_EPSILON = 1e-100
 
 def euclidean_distances(
     foreground_boundary_is,
@@ -158,7 +159,7 @@ def get_samples(
         nearest_candidates_count = scheme_config["nearest_candidates_count"]
         # choice between euclidean_distances/manhattan_distances/chebyshev_distances
         # chose Manhattan distances, gives same ranking as Euclidean but cheaper
-        foreground_boundary_distances, background_boundary_distances = euclidean_distances(
+        foreground_boundary_distances, background_boundary_distances = manhattan_distances(
             foreground_boundary_is,
             foreground_boundary_js,
             background_boundary_is,
@@ -179,7 +180,7 @@ def get_samples(
     elif scheme_config["name"] == "deterministic":
         # choice between euclidean_distances/manhattan_distances/chebyshev_distances
         # chose Manhattan distances, gives same ranking as Euclidean but cheaper
-        foreground_boundary_distances, background_boundary_distances = euclidean_distances(
+        foreground_boundary_distances, background_boundary_distances = manhattan_distances(
             foreground_boundary_is,
             foreground_boundary_js,
             background_boundary_is,
@@ -189,37 +190,27 @@ def get_samples(
         )
         foreground_choices = np.argsort(foreground_boundary_distances)[:foreground_samples_count]
         background_choices = np.argsort(background_boundary_distances)[:background_samples_count]
+    elif scheme_config["name"] == "deterministic_spread":
+        # choice between euclidean_distances/manhattan_distances/chebyshev_distances
+        # chose Manhattan distances, gives same ranking as Euclidean but cheaper
+        foreground_boundary_distances, background_boundary_distances = manhattan_distances(
+            foreground_boundary_is,
+            foreground_boundary_js,
+            background_boundary_is,
+            background_boundary_js,
+            unknown_i,
+            unknown_j
+        )
+        foreground_interval = len(foreground_boundary_distances) // foreground_samples_count
+        background_interval = len(background_boundary_distances) // background_samples_count
+        foreground_choices = np.argsort(foreground_boundary_distances)[::foreground_interval][:foreground_samples_count]
+        background_choices = np.argsort(background_boundary_distances)[::background_interval][:background_samples_count]
     else:
         raise NotImplementedError
 
     foreground_samples = global_foreground_boundary_pixels[foreground_choices]
-    foreground_sample_is = foreground_boundary_is[foreground_choices]
-    foreground_sample_js = foreground_boundary_js[foreground_choices]
     background_samples = global_background_boundary_pixels[background_choices]
-    background_sample_is = background_boundary_is[background_choices]
-    background_sample_js = background_boundary_js[background_choices]
-    return (
-        foreground_samples,
-        foreground_sample_is,
-        foreground_sample_js,
-        background_samples,
-        background_sample_is,
-        background_sample_js
-    )
-
-
-# TODO: unused?
-def estimate_alpha(c, f, b):
-    """
-    `c`: 1D length-C array (C=3 for RGB image). Unknown pixel.
-    `f`: 1D length-C array (C=3 for RGB image). Foreground sample.
-    `b`: 1D length-C array (C=3 for RGB image). Background sample.
-
-    Return: Scalar float estimate of alpha by projecting c onto the line between f and b, then calculating
-    where on the line (0 if at b, 1 if at f) the projected point sits.
-    """
-    f_minus_b = f - b
-    return np.dot(c - b, f_minus_b) / np.dot(f_minus_b, f_minus_b)
+    return foreground_samples, background_samples
 
 
 def penalty_distance_ratio_squared(c, f, b):
@@ -240,7 +231,20 @@ def penalty_distance_ratio_squared(c, f, b):
     numerator = np.dot(numerator, numerator)  # NB. no square root is done
     denominator = f - b
     denominator = np.dot(denominator, denominator)  # NB. no square root is done
-    return numerator / denominator  # TODO: division by zero
+    return numerator / (denominator + DIVISION_EPSILON)
+
+
+def estimate_alpha(c, f, b):
+    """
+    `c`: 1D length-C array (C=3 for RGB image). Unknown pixel.
+    `f`: 1D length-C array (C=3 for RGB image). Foreground sample.
+    `b`: 1D length-C array (C=3 for RGB image). Background sample.
+
+    Return: Scalar float estimate of alpha by projecting c onto the line between f and b, then calculating
+    where on the line (0 if at b, 1 if at f) the projected point sits.
+    """
+    f_minus_b = f - b
+    return np.dot(c - b, f_minus_b) / (np.dot(f_minus_b, f_minus_b) + DIVISION_EPSILON)
 
 
 def solve_alpha(
@@ -270,14 +274,18 @@ def solve_alpha(
     foreground_boundary_pixels = I[foreground_boundary_is, foreground_boundary_js]  # slow! do not do in a loop
     background_boundary_pixels = I[background_boundary_is, background_boundary_js]  # slow! do not do in a loop
 
+    result = np.zeros(I.shape, dtype=float)
+    result[foreground_map] = 1
+
+    # try parallelise the below.
+
     for (unknown_i, unknown_j) in tqdm(
         zip(*unknown_map.nonzero()), total=np.count_nonzero(unknown_map),
-        desc="Obtaining pixel samples for each unknown pixel",
+        desc="Obtaining pixel samples and confidences for each unknown pixel",
         disable=not logging.root.isEnabledFor(logging.INFO)
     ):
         c = I[unknown_i, unknown_j]
-        foreground_samples, foreground_sample_is, foreground_sample_js, \
-        background_samples, background_sample_is, background_sample_js = get_samples(
+        foreground_samples, background_samples = get_samples(
             I,
             foreground_boundary_is,
             foreground_boundary_js,
@@ -289,20 +297,14 @@ def solve_alpha(
             unknown_j,
             foreground_samples_count,
             background_samples_count,
-            scheme_config={"name": "global_random"}  # TODO: change to deterministic when done (is abt 3x slower)
+            scheme_config={"name": "deterministic_spread"}
         )
-
-        minimum_foreground_distance = foreground_samples - c  # foreground_samples_count x C float array
-        minimum_foreground_distance = np.min(np.sum(minimum_foreground_distance * minimum_foreground_distance, axis=1))  # this is D_F^2
-        penalty_foreground_weights = foreground_samples - c
-        penalty_foreground_weights = np.sum(penalty_foreground_weights * penalty_foreground_weights, axis=1) / minimum_foreground_distance
-        penalty_foreground_weights = np.exp(-penalty_foreground_weights)  # 1D length-foreground_samples_count float array
-
-        minimum_background_distance = background_samples - c  # background_samples_count x C float array
-        minimum_background_distance = np.min(np.sum(minimum_background_distance * minimum_background_distance, axis=1))  # this is D_B^2
-        penalty_background_weights = background_samples - c
-        penalty_background_weights = np.sum(penalty_background_weights * penalty_background_weights, axis=1) / minimum_background_distance
-        penalty_background_weights = np.exp(-penalty_background_weights)  # 1D length-foreground_samples_count float array
+        penalty_foreground_exparg = foreground_samples - c
+        penalty_foreground_exparg = np.sum(penalty_foreground_exparg * penalty_foreground_exparg, axis=1)
+        penalty_foreground_exparg = -penalty_foreground_exparg / (np.min(penalty_foreground_exparg) + DIVISION_EPSILON)  # this is dividing by D_F^2
+        penalty_background_exparg = background_samples - c
+        penalty_background_exparg = np.sum(penalty_background_exparg * penalty_background_exparg, axis=1)
+        penalty_background_exparg = -penalty_background_exparg / (np.min(penalty_background_exparg) + DIVISION_EPSILON) # this is dividing by D_B^2
 
         foreground_sample_i_background_sample_j_pairs = np.array(list(
             itertools.product(range(foreground_samples_count), range(background_samples_count))
@@ -311,38 +313,25 @@ def solve_alpha(
         for foreground_sample_i, background_sample_j in foreground_sample_i_background_sample_j_pairs:
             f = foreground_samples[foreground_sample_i]
             b = background_samples[background_sample_j]
-            print(f">>> {penalty_distance_ratio_squared(c, f, b)} {penalty_foreground_weights[foreground_sample_i]} {penalty_background_weights[background_sample_j]}")
-            confidence = penalty_distance_ratio_squared(c, f, b) * penalty_foreground_weights[foreground_sample_i] * penalty_background_weights[background_sample_j] / sigma_squared  # scalar
-            confidence = np.exp(-confidence)  # scalar
-            print(f"    | {confidence}")
+            # scalar. np.exp() is not performed as it doesn't affect ranking, and exponentiating causes many confidences to be clamped to 1 due to imprecision, which hinders sorting
+            confidence = -penalty_distance_ratio_squared(c, f, b) * math.exp(penalty_foreground_exparg[foreground_sample_i] + penalty_background_exparg[background_sample_j]) #  / sigma_squared  # doesn't affect ranking
             confidences.append(confidence)
         confidences = np.array(confidences)
         highest_confidence_argsort = np.argsort(confidences)[-highest_confidence_pairs_to_select:]
         estimated_alphas = []  # only the highest_confidence_pairs_to_select most confident ones
         for foreground_sample_i, background_sample_j in foreground_sample_i_background_sample_j_pairs[highest_confidence_argsort]:
             estimated_alphas.append(estimate_alpha(c, foreground_samples[foreground_sample_i], background_samples[background_sample_j]))
-        print(estimated_alphas)
-        print(confidences)
-        print(confidences[highest_confidence_argsort])
 
-        print(np.average(estimated_alphas, weights=confidences[highest_confidence_argsort]))
-        raise
+        result[unknown_i, unknown_j] = np.average(estimated_alphas, weights=np.exp(confidences[highest_confidence_argsort]))  # TODO: weighted average hm
 
-        print(foreground_samples)
+    result = np.clip(result, 0, 1)  # there tends to be some alphas that lie outside of [0, 1]...
+    # np.save("helpme.npy", result)
 
-        raise
+    # result = np.load("helpme.npy")
+    skimage.io.imshow(result)
+    skimage.io.show()
 
-    raise
 
-    # skimage.io.imshow(foreground_map)
-    # skimage.io.show()
-    # skimage.io.imshow(foreground_boundary_map)
-    # skimage.io.show()
-
-    # skimage.io.imshow(background_map)
-    # skimage.io.show()
-    # skimage.io.imshow(background_boundary_map)
-    # skimage.io.show()
 
     # print("entry")
     pass
