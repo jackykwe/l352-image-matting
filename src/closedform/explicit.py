@@ -1,14 +1,17 @@
+import logging
+
 import numpy as np
 import numpy.matlib as npmatlib
 import scipy.ndimage as spndimage
 import scipy.sparse as spsparse
 from scipy import linalg as splinalg
 from sksparse.cholmod import cholesky
+from tqdm.auto import tqdm
 
 # from scipy.sparse.linalg import spsolve  # fallback if cholesky doesn't work
 
 
-def get_laplacian(I, constrained_map, epsilon, window_size):
+def get_laplacian(I, constrained_map, epsilon, window_size, *, debug_levels_count):
     """
     `I`: H x W x C array
     `constrained_map`: H x W float array
@@ -35,7 +38,11 @@ def get_laplacian(I, constrained_map, epsilon, window_size):
     constructor_vals = np.zeros(constructor_length)
 
     len = 0
-    for i in range(window_size, H - window_size):
+    for i in tqdm(
+        range(window_size, H - window_size),
+        desc=f"Explicitly generating Laplacian for layer {debug_levels_count}",
+        disable=not logging.root.isEnabledFor(logging.INFO)
+    ):
         for j in range(window_size, W - window_size):
             # (i, j) represents a particular window centre k
             if constrained_map[i, j]:
@@ -49,14 +56,14 @@ def get_laplacian(I, constrained_map, epsilon, window_size):
             # NB. The following (window_var) is the matrix (\Sigma_{(k)} + \frac{\epsilon}{M^2} I_{CxC})^{-1} in my proof
             window_var = splinalg.inv((window_I.T @ window_I) / neighbourhood_size - window_mu @ window_mu.T + epsilon / neighbourhood_size * np.eye(C))
             window_I = window_I - npmatlib.repmat(window_mu.T, neighbourhood_size, 1)
-            # NB. The following (temp_vals) is the 1/M^2 * (1 + (...)^T (...)^{-1} scalar term for (k)
+            # NB. The following (temp_vals) is the 1/M^2 * (1 + (...)^T (...)^{-1} (...)) scalar term for (k)
             # to be used in the computation of Laplacian matrix elements for all M^2 x M^2 possible
             # (i, j) pairs represented by window_indices
             temp_vals = (1 + window_I @ window_var @ window_I.T) / neighbourhood_size  # neighbourhood_size x neighbourhood_size matrix
 
             constructor_vals[len:len + neighbourhood_size_squared] = temp_vals.flatten()  # row-major
-            # corresponding row_indices should look like [0, 0, ..., 0                     , 1, 1, ..., 1                     , ..., neighbourhood_size_squared - 1]
-            # corresponding col_indices should look like [0, 1, ..., neighbourhood_size - 1, 0, 1, ..., neighbourhood_size - 1, ..., neighbourhood_size_squared - 1]
+            # corresponding row_indices[len:len + neighbourhood_size_squared] should look like [0, 0, ..., 0                     , 1, 1, ..., 1                     , ..., neighbourhood_size_squared - 1]
+            # corresponding col_indices[len:len + neighbourhood_size_squared] should look like [0, 1, ..., neighbourhood_size - 1, 0, 1, ..., neighbourhood_size - 1, ..., neighbourhood_size_squared - 1]
             constructor_row_indices[len:len + neighbourhood_size_squared] = npmatlib.repmat(window_indices, neighbourhood_size, 1).flatten(order="F")
             constructor_col_indices[len:len + neighbourhood_size_squared] = npmatlib.repmat(window_indices, neighbourhood_size, 1).flatten()
             len += neighbourhood_size_squared
@@ -73,7 +80,7 @@ def get_laplacian(I, constrained_map, epsilon, window_size):
     return result
 
 
-def solve_alpha_explicit(I, constrained_map, constrained_vals, epsilon, window_size):
+def solve_alpha_explicit(I, constrained_map, constrained_vals, epsilon, window_size, *, debug_levels_count):
     """
     `I`: H x W x C float array
     `constrained_map`: H x W float array
@@ -86,7 +93,7 @@ def solve_alpha_explicit(I, constrained_map, constrained_vals, epsilon, window_s
     assert constrained_vals.dtype == float
 
     H, W, C = I.shape
-    L = get_laplacian(I, constrained_map, epsilon, window_size)
+    L = get_laplacian(I, constrained_map, epsilon, window_size, debug_levels_count=debug_levels_count)
     D = spsparse.diags(constrained_map.flatten(), 0, shape=(H * W, H * W), format="csr")
     lagrangian_lambda = 100
     A = L + lagrangian_lambda * D

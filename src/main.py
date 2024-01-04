@@ -67,9 +67,6 @@ if __name__ == "__main__":
             args.epsilon,
             args.window_size
         )  # H x W array
-        # alpha = np.clip(alpha, 0, 1)
-        skimage.io.imshow(alpha)
-        skimage.io.show()
     elif args.subcommand == "robust":
         logging.info(f"Opening {args.image_path}")
         I = skimage.io.imread(args.image_path) / 255
@@ -97,8 +94,9 @@ if __name__ == "__main__":
             background_map,
             unknown_map
         )  # H x W array
-        # alpha = np.clip(alpha, 0, 1)
-        skimage.io.imshow(alpha)
-        skimage.io.show()
     else:
         raise NotImplementedError
+
+    alpha = np.clip(alpha, 0, 1)  # there tends to be some alphas that lie outside of [0, 1]...
+    skimage.io.imshow(alpha)
+    skimage.io.show()

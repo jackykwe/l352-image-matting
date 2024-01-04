@@ -192,7 +192,8 @@ def solve_alpha_coarse_to_fine(
             constrained_map,  # H x W float array
             constrained_vals,  # H x W float array
             epsilon,
-            window_size
+            window_size,
+            debug_levels_count=levels_count
         )
 
     # alpha = np.clip(alpha, 0, 1)
