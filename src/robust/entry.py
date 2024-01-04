@@ -131,11 +131,13 @@ def get_samples(
     - `{"name": "global_random"}`
     - `{"name": "local_random", "nearest_candidates_count": int}`
     - `{"name": "deterministic"}`
+    - `{"name": "deterministic_spread"}`
 
     For an unknown pixel at coordinates `unknown_ij, the schemes behave differently:
     - `global_random`: sample `foreground_samples_count` pixels randomly from all foreground boundary pixels; likewise for background
     - `local_random`: sample `foreground_samples_count` pixels randomly from the nearest `nearest_candidates_count` foreground boundary pixels; likewise for background
     - `deterministic`: sample the nearest `foreground_samples_count` foreground boundary pixels; likewise for background
+    - `deterministic_spread`: same as `deterministic`, but the samples are evenly spread across image, like the circles in Figure 5(b)
 
     Returns:
     ```
@@ -148,8 +150,14 @@ def get_samples(
     Useful discussion on distance metrics at https://chris3606.github.io/GoRogue/articles/grid_components/measuring-distance.html
     """
     if scheme_config["name"] == "global_random":
-        foreground_choices = np.random.choice(len(global_foreground_boundary_pixels), foreground_samples_count, replace=False)
-        background_choices = np.random.choice(len(global_background_boundary_pixels), background_samples_count, replace=False)
+        # foreground_choices = np.random.choice(len(global_foreground_boundary_pixels), foreground_samples_count, replace=False)
+        # background_choices = np.random.choice(len(global_background_boundary_pixels), background_samples_count, replace=False)
+        foreground_choices = np.random.default_rng(seed=42).choice(len(global_foreground_boundary_pixels), foreground_samples_count, replace=False)
+        background_choices = np.random.default_rng(seed=42).choice(len(global_background_boundary_pixels), background_samples_count, replace=False)
+
+        #QUESTION: IS IT A PROBLEM WITH SAMPLING? SHLD EACH UNKNOWN PIXEL HAVE THE SAME SAMPLES?
+        #QUESTION: IS IT A PROBLEM WITH INTERPRETING RT LU?
+        #             OR ... BOTH? OR... SOMETHING ELSE?
     elif scheme_config["name"] == "local_random":
         nearest_candidates_count = scheme_config["nearest_candidates_count"]
         # choice between euclidean_distances/manhattan_distances/chebyshev_distances
@@ -259,19 +267,28 @@ def get_laplacian(I, epsilon, window_size, index_displacement_map):
             constructor_row_indices[len:len + neighbourhood_size_squared] = npmatlib.repmat(window_indices_displaced, neighbourhood_size, 1).flatten(order="F")
             constructor_col_indices[len:len + neighbourhood_size_squared] = npmatlib.repmat(window_indices_displaced, neighbourhood_size, 1).flatten()
             len += neighbourhood_size_squared
-    result = spsparse.csr_array((constructor_vals, (constructor_row_indices, constructor_col_indices)), shape=(H * W, H * W)) # this is A in MATLAB code
+    W_mat = spsparse.csr_array((constructor_vals, (constructor_row_indices, constructor_col_indices)), shape=(H * W, H * W)) # this is A in MATLAB code
+
+    W_mat.setdiag(0)  # Zero diagonals? TODO not sure if there is an effect; doesn't seem like it
+    W_mat_row_sum = W_mat.sum(axis=1)  # this is sumA in MATLAB code
+    D = spsparse.diags(W_mat_row_sum, 0, shape=(H * W, H * W), format="csr")
+    result = D - W_mat
     return result
+
 
 def solve_alpha(
         I,
         foreground_map,
         background_map,
         unknown_map,
-        foreground_samples_count=1,
-        background_samples_count=1,
+        foreground_samples_count=20,
+        background_samples_count=20,
+        sampling_method="deterministic_spread",
+        nearest_candidates_count=40,
         sigma_squared=0.01,
         highest_confidence_pairs_to_select=3,
         epsilon=1e-5,
+        gamma=0.1,
         window_size=1
     ):
     """
@@ -298,6 +315,15 @@ def solve_alpha(
     estimated_alphas = np.zeros((unknown_count, highest_confidence_pairs_to_select), dtype=float)  # row-major traversal of unknown pixels;  unknown_count x highest_confidence_pairs_to_select float array
     estimated_confidences = np.zeros((unknown_count, highest_confidence_pairs_to_select), dtype=float)  # row-major traversal of unknown pixels;  unknown_count x highest_confidence_pairs_to_select float array
 
+    if sampling_method == "local_random":
+        scheme_config = {"name": "local_random", "nearest_candidates_count": nearest_candidates_count}
+    else:
+        scheme_config = {"name": sampling_method}
+
+
+    # OVERRIDE
+    scheme_config = {"name": "global_random"}
+
     for i, (unknown_i, unknown_j) in enumerate(tqdm(
         zip(*unknown_map.nonzero()), total=np.count_nonzero(unknown_map),
         desc="Obtaining pixel samples and confidences for each unknown pixel",
@@ -315,7 +341,7 @@ def solve_alpha(
             unknown_j,
             foreground_samples_count,
             background_samples_count,
-            scheme_config={"name": "deterministic_spread"}
+            scheme_config
         )
         # Names now in 2D world (what we are familiar with)
         cT_minus_FiT = cT - FiT  # foreground_samples_count x C float array
@@ -349,6 +375,13 @@ def solve_alpha(
     estimated_alphas = np.mean(estimated_alphas, axis=1)  # row-major traversal of unknown pixels;  1D length-(unknown_count) float array
     estimated_confidences = np.mean(np.exp(estimated_confidences), axis=1)  # row-major traversal of unknown pixels;  1D length-(unknown_count) float array
 
+    estimated_result = foreground_map.astype(float)  # H x W float array
+    estimated_result[unknown_map] = estimated_alphas
+    estimated_result = np.clip(estimated_result, 0, 1)
+    print("Showing estimated result")
+    skimage.io.imshow(estimated_result)
+    skimage.io.show()
+
     indices = np.arange(H * W).reshape((H, W))  # row-major
     unknown_indices_rowmaj = indices[unknown_map]  # row-major traversal of unknown pixels;  1D length-(unknown_count) int array
     known_indices_rowmaj = indices[~unknown_map]  # row-major traversal of known pixels;  1D length-(known_count) int array
@@ -357,38 +390,16 @@ def solve_alpha(
     index_displacement_map[known_indices_rowmaj] = np.arange(known_count)
     index_displacement_map[unknown_indices_rowmaj] = known_count + np.arange(unknown_count)
 
-    WiF = estimated_confidences * estimated_alphas + (1 - estimated_confidences) * (estimated_alphas > 0.5).astype(int)  # row-major traversal of unknown pixels;  1D length-(unknown_count) float array
-    WiB = estimated_confidences * (1 - estimated_alphas) + (1 - estimated_confidences) * (estimated_alphas < 0.5).astype(int)  # row-major traversal of unknown pixels;  1D length-(unknown_count) float array
+    WiF = gamma * (estimated_confidences * estimated_alphas + (1 - estimated_confidences) * (estimated_alphas > 0.5).astype(int))  # row-major traversal of unknown pixels;  1D length-(unknown_count) float array
+    WiB = gamma * (estimated_confidences * (1 - estimated_alphas) + (1 - estimated_confidences) * (estimated_alphas < 0.5).astype(int))  # row-major traversal of unknown pixels;  1D length-(unknown_count) float array
     L = get_laplacian(I, epsilon, window_size, index_displacement_map).tolil()  # H x W sparse-LIL float matrix. LIL format required for fancy indexing and still retaining sparse format
 
     RT_fragment = L[known_count:, :known_count]  # a little slow
-    # print(RT_fragment.shape)
-
-    # IMPOSSIBLE TO EXECUTE DUE TO OOM CONSTRUCTING THE INDEXING INDICES
-    # RT_fragment = L[np.repeat(unknown_indices_rowmaj, known_count), np.tile(known_indices_rowmaj, unknown_count)].reshape(unknown_count, known_count)
-
-    # TOO SLOW
-    # sparse_arrays_to_concatenate = []
-    # for unknown_index_rowmaj in tqdm(unknown_indices_rowmaj, desc="holy"):
-    #     sparse_arrays_to_concatenate.append(L[[unknown_index_rowmaj] * known_count, known_indices_rowmaj])
-    # RT_fragment = spsparse.hstack(sparse_arrays_to_concatenate)
-
     RT = spsparse.hstack((WiF.reshape(-1, 1), WiB.reshape(-1, 1), RT_fragment), format="csr")
-    # print(RT.shape)
-    # print(type(RT))
-
     Lu = L[known_count:, known_count:].reshape(unknown_count, unknown_count).tocsr()
-    # print(Lu.shape)
-    # print(type(Lu))
-
     result = foreground_map.astype(float)  # H x W float array
     Ak = np.concatenate(([1, 0], result[~unknown_map]))
-    # print(Ak.shape)
-    # print(type(Ak))
-
     negative_RT_Ak = -RT @ Ak
-    # print(negative_RT_Ak.shape)
-    # print(type(negative_RT_Ak))
 
     solved_alphas, result_code = spsparselinalg.cg(Lu, negative_RT_Ak)
     assert result_code == 0, f"Conjugate Gradient did not successfully exit, got result code {result_code} (expected 0)"

@@ -27,8 +27,8 @@ if __name__ == "__main__":
     closed_form_parser = subparsers.add_parser("closedform")
     closed_form_parser.add_argument("-i", "--image-path", type=str, help="Path to original image", required=True)
     closed_form_parser.add_argument("-s", "--scribble-path", type=str, help="Path to scribble", required=True)
-    closed_form_parser.add_argument("-a", "--alpha-threshold", type=int, default=0.02, help="Alpha values within this close to 0 and 1 are pushed to 0 and 1 respectively (default: %(default)s)")
-    closed_form_parser.add_argument("-e", "--epsilon", type=int, default=1e-7, help="Epsilon parameter (default: %(default)s)")
+    closed_form_parser.add_argument("-a", "--alpha-threshold", type=float, default=0.02, help="Alpha values within this close to 0 and 1 are pushed to 0 and 1 respectively (default: %(default)s)")
+    closed_form_parser.add_argument("-e", "--epsilon", type=float, default=1e-7, help="Epsilon parameter (default: %(default)s)")
     closed_form_parser.add_argument("-w", "--window-size", type=int, choices=(1, 2), default=1, help="One-sided window size. 1 means 3x3 window. 2 means 5x5 window. (default: %(default)s)")
     closed_form_parser.add_argument("-l", "--levels-count", type=int, default=4, help="Number of layers in coarse-to-fine pyramid, with each coarser layer downsampled from the previous by a factor of 2 (default: %(default)s)")
     closed_form_parser.add_argument("-L", "--explicit-alpha-levels-count", type=int, default=2, help="Number of coarsest levels to explicitly calculate alphas; the finer (levels_count - explicit_alpha_levels_count) levels will not solve for the Laplacian directly but interpolate linear coefficients to derive alpha. Require that active_levels_num <= levels_num. (default: %(default)s)")
@@ -36,8 +36,19 @@ if __name__ == "__main__":
     robust_parser = subparsers.add_parser("robust")
     robust_parser.add_argument("-i", "--image-path", type=str, help="Path to original image", required=True)
     robust_parser.add_argument("-t", "--trimap-path", type=str, help="Path to trimap")
+    robust_parser.add_argument("-f", "--foreground-samples-count", type=int, default=20, help="Number of foreground pixels to sample for each unknown pixel (default: %(default)s)")
+    robust_parser.add_argument("-b", "--background-samples-count", type=int, default=20, help="Number of background pixels to sample for each unknown pixel (default: %(default)s)")
+    robust_parser.add_argument("-m", "--sampling-method", type=str, choices=("global_random", "local_random", "deterministic", "deterministic_spread"), default="deterministic_spread", help="How to sample foreground and background pixels for each unknown pixel. For more details, see documentation of the `get_samples()` method in source code (default: %(default)s)")
+    robust_parser.add_argument("-x", "--nearest-candidates-count", type=int, default=40, help="Only effective when -m/--sampling-method is `local_random`. How many nearest candidates to choose before randomly choosing `fore/background-samples-count`. For more details, see documentation of the `get_samples()` method in source code (default: %(default)s)")
+    robust_parser.add_argument("-s", "--sigma-squared", type=float, default=0.01, help="Sigma parameter, squared (default: %(default)s)")
+    robust_parser.add_argument("-n", "--highest-confidence_pairs_to_select", type=int, default=3, help="Number of highest confidence pairs to select for estimation of alpha for each unknown pixel (default: %(default)s)")
+    robust_parser.add_argument("-e", "--epsilon", type=float, default=1e-5, help="Epsilon parameter (default: %(default)s)")
+    robust_parser.add_argument("-g", "--gamma", type=float, default=0.1, help="Gamma parameter (default: %(default)s)")
+    robust_parser.add_argument("-w", "--window-size", type=int, choices=(1, 2), default=1, help="One-sided window size. 1 means 3x3 window. 2 means 5x5 window. (default: %(default)s)")
 
     args = parser.parse_args()
+    print(args)
+
     if args.verbose == 1:
         logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", datefmt="%y%m%d %H%M%S", level=logging.INFO)
     elif args.verbose > 1:
@@ -92,7 +103,16 @@ if __name__ == "__main__":
             I,
             foreground_map,
             background_map,
-            unknown_map
+            unknown_map,
+            args.foreground_samples_count,
+            args.background_samples_count,
+            args.sampling_method,
+            args.nearest_candidates_count,
+            args.sigma_squared,
+            args.highest_confidence_pairs_to_select,
+            args.epsilon,
+            args.gamma,
+            args.window_size
         )  # H x W array
     else:
         raise NotImplementedError
