@@ -5,7 +5,7 @@ import scipy.ndimage as spndimage
 from scipy import linalg as splinalg
 from tqdm.auto import tqdm
 
-from . import explicit, sampling, utils
+from . import explicit, updownsampling, utils
 
 
 def get_linear_coefficients(alpha, I, epsilon, window_size, *, debug_levels_count):
@@ -89,7 +89,7 @@ def upsample_alpha_using_image(downsampled_alpha, downsampled_I, I, epsilon, win
 
     logging.debug("upsample_alpha_using_image invoked")
     downsampled_linear_coefficients = get_linear_coefficients(downsampled_alpha, downsampled_I, epsilon, window_size, debug_levels_count=debug_levels_count)  # ceil((H - 2 * antialiasing_filter_size) / 2) x ceil((W - 2 * antialiasing_filter_size) / 2) x (C + 1) float array
-    linear_coefficients = sampling.upsample_image(downsampled_linear_coefficients, I.shape[0], I.shape[1])  # this is bcoeff in MATLAB code; H x W x (C + 1) float array
+    linear_coefficients = updownsampling.upsample_image(downsampled_linear_coefficients, I.shape[0], I.shape[1])  # this is bcoeff in MATLAB code; H x W x (C + 1) float array
 
     # Using equation $\forall i. \alpha_i = a_i^T I_i + b_i$ where a_i, I_i are vectors and b_i is scalar
     result = np.sum(linear_coefficients[:, :, :-1] * I, axis=2) + linear_coefficients[:, :, -1]
@@ -125,12 +125,12 @@ def solve_alpha_coarse_to_fine(
     erode_mask_size = 1  # TODO shouldn't this be equal to window_size?
     assert explicit_alpha_levels_count >= 1
     if levels_count >= 2:
-        downsampled_I = sampling.downsample_image(I, antialiasing_filter_size=2)  # ceil((H - 2 * antialiasing_filter_size) / 2) x ceil((W - 2 * antialiasing_filter_size) / 2) x C float array
+        downsampled_I = updownsampling.downsample_image(I, antialiasing_filter_size=2)  # ceil((H - 2 * antialiasing_filter_size) / 2) x ceil((W - 2 * antialiasing_filter_size) / 2) x C float array
         downsampled_constrained_map = np.round(
-            sampling.downsample_image(utils.ensure_3d_image(constrained_map), antialiasing_filter_size=2).squeeze()
+            updownsampling.downsample_image(utils.ensure_3d_image(constrained_map), antialiasing_filter_size=2).squeeze()
         )  # ceil((H - 2 * antialiasing_filter_size) / 2) x ceil((W - 2 * antialiasing_filter_size) / 2) float array
         downsampled_constrained_vals = np.round(
-            sampling.downsample_image(utils.ensure_3d_image(constrained_vals), antialiasing_filter_size=2).squeeze()
+            updownsampling.downsample_image(utils.ensure_3d_image(constrained_vals), antialiasing_filter_size=2).squeeze()
         )  # ceil((H - 2 * antialiasing_filter_size) / 2) x ceil((W - 2 * antialiasing_filter_size) / 2) float array
 
         # logging.debug(f"[fineness {levels_count}] displaying downsampled_constrained_map")

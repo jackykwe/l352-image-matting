@@ -67,10 +67,6 @@ def get_laplacian(I, constrained_map, epsilon, window_size, *, debug_levels_coun
             constructor_row_indices[len:len + neighbourhood_size_squared] = npmatlib.repmat(window_indices, neighbourhood_size, 1).flatten(order="F")
             constructor_col_indices[len:len + neighbourhood_size_squared] = npmatlib.repmat(window_indices, neighbourhood_size, 1).flatten()
             len += neighbourhood_size_squared
-    assert constructor_length == len
-    constructor_vals = constructor_vals[:len]  # TODO: redundant?
-    constructor_row_indices = constructor_row_indices[:len]  # TODO: redundant?
-    constructor_col_indices = constructor_col_indices[:len]  # TODO: redundant?
     W_mat = spsparse.csr_array((constructor_vals, (constructor_row_indices, constructor_col_indices)), shape=(H * W, H * W)) # this is A in MATLAB code
     W_mat_row_sum = W_mat.sum(axis=1)  # this is sumA in MATLAB code
     D = spsparse.diags(W_mat_row_sum, 0, shape=(H * W, H * W), format="csr")

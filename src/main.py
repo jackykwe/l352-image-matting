@@ -4,16 +4,19 @@ import logging
 import numpy as np
 import skimage
 
-import closedform.coarse_to_fine
+import closedform.coarsetofine
 import closedform.utils
 import robust.entry
 
 # python3 src/main.py -v closedform -i datasets/input_training_lowres/GT01.png -s datasets/input_training_lowres/GT01-scribble.png -l 4 -L 2
+# python3 src/main.py -v closedform -i datasets/input_training_lowres/GT02.png -s datasets/input_training_lowres/GT02-scribble.png -l 4 -L 2
 # python3 src/main.py -v closedform -i matlab/peacock.bmp -s matlab/peacock_m.bmp -l 4 -L 2
 
 # Trimap1 is finer.
 # Trimap2 is coarser.
 # python3 src/main.py -v robust -i datasets/input_training_lowres/GT01.png -t datasets/trimap_training_lowres/Trimap1/GT01.png
+# python3 src/main.py -v robust -i datasets/input_training_lowres/GT01.png -t datasets/trimap_training_lowres/Trimap2/GT01.png
+# ...
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -68,7 +71,7 @@ if __name__ == "__main__":
         constrained_map = (np.sum(np.absolute(I - I_scribble), axis=2) > 1e-3).astype(float)  # this is consts_map in MATLAB; H x W array
         constrained_vals = I_scribble_gray2D * constrained_map  # NB. * is the element-wise multiply operator; H x W array
 
-        alpha = closedform.coarse_to_fine.solve_alpha_coarse_to_fine(
+        alpha = closedform.coarsetofine.solve_alpha_coarse_to_fine(
             I,
             constrained_map,
             constrained_vals,
