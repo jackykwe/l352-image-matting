@@ -38,8 +38,8 @@ if __name__ == "__main__":
     robust_parser.add_argument("-t", "--trimap-path", type=str, help="Path to trimap")
     robust_parser.add_argument("-f", "--foreground-samples-count", type=int, default=20, help="Number of foreground pixels to sample for each unknown pixel (default: %(default)s)")
     robust_parser.add_argument("-b", "--background-samples-count", type=int, default=20, help="Number of background pixels to sample for each unknown pixel (default: %(default)s)")
-    robust_parser.add_argument("-m", "--sampling-method", type=str, choices=("global_random", "local_random", "deterministic", "deterministic_spread"), default="deterministic_spread", help="How to sample foreground and background pixels for each unknown pixel. For more details, see documentation of the `get_samples()` method in source code (default: %(default)s)")
-    robust_parser.add_argument("-x", "--nearest-candidates-count", type=int, default=40, help="Only effective when -m/--sampling-method is `local_random`. How many nearest candidates to choose before randomly choosing `fore/background-samples-count`. For more details, see documentation of the `get_samples()` method in source code (default: %(default)s)")
+    robust_parser.add_argument("-m", "--sampling-method", type=str, choices=("global_random_same", "global_random", "local_random", "deterministic", "deterministic_spread_global", "deterministic_spread_local"), default="deterministic_spread_local", help="How to sample foreground and background pixels for each unknown pixel. For more details, see documentation of the `get_samples()` method in source code (default: %(default)s)")
+    robust_parser.add_argument("-x", "--nearest-candidates-count", type=int, default=200, help="Only effective when -m/--sampling-method is `local_random` or `deterministic_spread_local`. How many nearest candidates to choose before randomly choosing `fore/background-samples-count`. For more details, see documentation of the `get_samples()` method in source code (default: %(default)s)")
     robust_parser.add_argument("-s", "--sigma-squared", type=float, default=0.01, help="Sigma parameter, squared (default: %(default)s)")
     robust_parser.add_argument("-n", "--highest-confidence_pairs_to_select", type=int, default=3, help="Number of highest confidence pairs to select for estimation of alpha for each unknown pixel (default: %(default)s)")
     robust_parser.add_argument("-e", "--epsilon", type=float, default=1e-5, help="Epsilon parameter (default: %(default)s)")
@@ -47,12 +47,12 @@ if __name__ == "__main__":
     robust_parser.add_argument("-w", "--window-size", type=int, choices=(1, 2), default=1, help="One-sided window size. 1 means 3x3 window. 2 means 5x5 window. (default: %(default)s)")
 
     args = parser.parse_args()
-    print(args)
 
     if args.verbose == 1:
         logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", datefmt="%y%m%d %H%M%S", level=logging.INFO)
     elif args.verbose > 1:
         logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", datefmt="%y%m%d %H%M%S", level=logging.DEBUG)
+        logging.debug(args)
 
     if args.subcommand == "closedform":
         logging.info(f"Opening {args.image_path}")

@@ -128,36 +128,42 @@ def get_samples(
     `foreground_samples_count`: number of foreground pixel samples to return
     `background_samples_count`: number of background pixel samples to return
     `scheme`: takes the shape of one of the following:
+    - `{"name": "global_random_same"}`
     - `{"name": "global_random"}`
     - `{"name": "local_random", "nearest_candidates_count": int}`
     - `{"name": "deterministic"}`
-    - `{"name": "deterministic_spread"}`
+    - `{"name": "deterministic_spread_global"}`
+    - `{"name": "deterministic_spread_local", "nearest_candidates_count": int}`
 
     For an unknown pixel at coordinates `unknown_ij, the schemes behave differently:
-    - `global_random`: sample `foreground_samples_count` pixels randomly from all foreground boundary pixels; likewise for background
-    - `local_random`: sample `foreground_samples_count` pixels randomly from the nearest `nearest_candidates_count` foreground boundary pixels; likewise for background
-    - `deterministic`: sample the nearest `foreground_samples_count` foreground boundary pixels; likewise for background
-    - `deterministic_spread`: same as `deterministic`, but the samples are evenly spread across image, like the circles in Figure 5(b)
+    - `global_random_same`: sample `foreground_samples_count` pixels randomly from all foreground boundary pixels; likewise for background. all unknown pixels use the same samples.
+    - `global_random`: same as `global_random_same` but resampling is performed for each unknown pixel.
+    - `local_random`: sample `foreground_samples_count` pixels randomly from the nearest `nearest_candidates_count` foreground boundary pixels; likewise for background. resampling is performed for each unknown pixel.
+    - `deterministic`: sample the nearest `foreground_samples_count` foreground boundary pixels; likewise for background. resampling is performed for each unknown pixel.
+    - `deterministic_spread_global`: same as `deterministic`, but the samples are evenly spread across image, like the circles in Figure 5(b). resampling is performed for each unknown pixel.
+    - `deterministic_spread_local`: same as `deterministic_spread_global`, but the samples are evenly spread across the nearest `nearest_candidates_count` fore/background pixels, like the circles in Figure 5(b). resampling is performed for each unknown pixel. This is the default scheme.
 
     Returns:
     ```
     (
         foreground_samples_count x C float array,  (foreground pixel values)
         background_samples_count x C float array,  (background pixel values)
+        1D length-(foreground_samples_count) int array,  (foreground pixel x-coordinates)
+        1D length-(foreground_samples_count) int array,  (foreground pixel y-coordinates)
+        1D length-(background_samples_count) int array,  (background pixel x-coordinates)
+        1D length-(background_samples_count) int array,  (background pixel y-coordinates)
     )
     ```
 
     Useful discussion on distance metrics at https://chris3606.github.io/GoRogue/articles/grid_components/measuring-distance.html
     """
-    if scheme_config["name"] == "global_random":
-        # foreground_choices = np.random.choice(len(global_foreground_boundary_pixels), foreground_samples_count, replace=False)
-        # background_choices = np.random.choice(len(global_background_boundary_pixels), background_samples_count, replace=False)
-        foreground_choices = np.random.default_rng(seed=42).choice(len(global_foreground_boundary_pixels), foreground_samples_count, replace=False)
-        background_choices = np.random.default_rng(seed=42).choice(len(global_background_boundary_pixels), background_samples_count, replace=False)
-
-        #QUESTION: IS IT A PROBLEM WITH SAMPLING? SHLD EACH UNKNOWN PIXEL HAVE THE SAME SAMPLES?
-        #QUESTION: IS IT A PROBLEM WITH INTERPRETING RT LU?
-        #             OR ... BOTH? OR... SOMETHING ELSE?
+    if scheme_config["name"] == "global_random_same":
+        rng = np.random.default_rng(seed=42)
+        foreground_choices = rng.choice(len(global_foreground_boundary_pixels), foreground_samples_count, replace=False)
+        background_choices = rng.choice(len(global_background_boundary_pixels), background_samples_count, replace=False)
+    elif scheme_config["name"] == "global_random":
+        foreground_choices = np.random.choice(len(global_foreground_boundary_pixels), foreground_samples_count, replace=False)
+        background_choices = np.random.choice(len(global_background_boundary_pixels), background_samples_count, replace=False)
     elif scheme_config["name"] == "local_random":
         nearest_candidates_count = scheme_config["nearest_candidates_count"]
         # choice between euclidean_distances/manhattan_distances/chebyshev_distances
@@ -193,7 +199,7 @@ def get_samples(
         )
         foreground_choices = np.argsort(foreground_boundary_distances)[:foreground_samples_count]
         background_choices = np.argsort(background_boundary_distances)[:background_samples_count]
-    elif scheme_config["name"] == "deterministic_spread":
+    elif scheme_config["name"] == "deterministic_spread_global":
         # choice between euclidean_distances/manhattan_distances/chebyshev_distances
         # chose Manhattan distances, gives same ranking as Euclidean but cheaper
         foreground_boundary_distances, background_boundary_distances = manhattan_distances(
@@ -208,17 +214,43 @@ def get_samples(
         background_interval = len(background_boundary_distances) // background_samples_count
         foreground_choices = np.argsort(foreground_boundary_distances)[::foreground_interval][:foreground_samples_count]
         background_choices = np.argsort(background_boundary_distances)[::background_interval][:background_samples_count]
+    elif scheme_config["name"] == "deterministic_spread_local":
+        nearest_candidates_count = scheme_config["nearest_candidates_count"]
+        # choice between euclidean_distances/manhattan_distances/chebyshev_distances
+        # chose Manhattan distances, gives same ranking as Euclidean but cheaper
+        foreground_boundary_distances, background_boundary_distances = manhattan_distances(
+            foreground_boundary_is,
+            foreground_boundary_js,
+            background_boundary_is,
+            background_boundary_js,
+            unknown_i,
+            unknown_j
+        )
+        foreground_interval = nearest_candidates_count // foreground_samples_count
+        background_interval = nearest_candidates_count // background_samples_count
+        foreground_choices = np.argsort(foreground_boundary_distances)[:nearest_candidates_count:foreground_interval][:foreground_samples_count]
+        background_choices = np.argsort(background_boundary_distances)[:nearest_candidates_count:background_interval][:background_samples_count]
     else:
         raise NotImplementedError
 
     foreground_samples = global_foreground_boundary_pixels[foreground_choices]
     background_samples = global_background_boundary_pixels[background_choices]
-    return foreground_samples, background_samples
+    assert len(foreground_samples) == foreground_samples_count, f"len(foreground_samples) ({len(foreground_samples)}) != foreground_samples_count {foreground_samples_count}"
+    assert len(background_samples) == background_samples_count, f"len(background_samples) ({len(background_samples)}) != background_samples_count {background_samples_count}"
+    return (
+        foreground_samples,
+        background_samples,
+        foreground_boundary_is[foreground_choices],  # returned for debugging purposes
+        foreground_boundary_js[foreground_choices],  # returned for debugging purposes
+        background_boundary_is[background_choices],  # returned for debugging purposes
+        background_boundary_js[background_choices]  # returned for debugging purposes
+    )
 
 
-def get_laplacian(I, epsilon, window_size, index_displacement_map):
+def get_laplacian(I, constrained_map, epsilon, window_size, index_displacement_map):
     """
     `I`: H x W x C array
+    `constrained_map`: H x W bool array
 
     Returns: HW x HW sparse float array
 
@@ -227,11 +259,14 @@ def get_laplacian(I, epsilon, window_size, index_displacement_map):
     neighbourhood_size = (1 + 2 * window_size) ** 2
     neighbourhood_size_squared = neighbourhood_size ** 2
     H, W, C = I.shape
+    # constrain a pixel iff all pixels in its neighbourhood are also constrained. For these centres, no need to enforce linear colour model,
+    # so we omit summing them. Remember the alphaT L alpha term is there to enforce the smoothness/linear colour models.
+    constrained_map = spndimage.binary_erosion(constrained_map, np.ones((1 + 2 * window_size, 1 + 2 * window_size))).astype(int)
 
     indices = np.arange(H * W).reshape((H, W))  # row-major
     # temp_length is the number of window centres (excluding a strip of width window_size around image) that we need to sum
     # i.e. those whose neighbourhoods contain at least one unconstrained pixel
-    constructor_length = (H - 2 * window_size) * (W - 2 * window_size) * neighbourhood_size_squared  # this is tlen in MATLAB code; this is the length of the arguments to sp.sparse.csr_matrix(). Here in Python we also exploit the feature of csr_matrix() that accumulates values of duplicated indices
+    constructor_length = np.sum(1 - constrained_map[window_size:-window_size, window_size:-window_size]) * neighbourhood_size_squared  # this is tlen in MATLAB code; this is the length of the arguments to sp.sparse.csr_matrix(). Here in Python we also exploit the feature of csr_matrix() that accumulates values of duplicated indices
 
     # These three are arguments to the sp.sparse.csr_matrix() sparse matrix constructor
     constructor_row_indices = np.zeros(constructor_length)
@@ -246,6 +281,8 @@ def get_laplacian(I, epsilon, window_size, index_displacement_map):
     ):
         for j in range(window_size, W - window_size):
             # (i, j) represents a particular window centre k
+            if constrained_map[i, j]:
+                continue
 
             window_indices = indices[i - window_size:i + window_size + 1, j - window_size:j + window_size + 1].flatten()  # row-major
             # NB. The following (window_I) is the matrix A_{(k)} in my proof
@@ -268,12 +305,48 @@ def get_laplacian(I, epsilon, window_size, index_displacement_map):
             constructor_col_indices[len:len + neighbourhood_size_squared] = npmatlib.repmat(window_indices_displaced, neighbourhood_size, 1).flatten()
             len += neighbourhood_size_squared
     W_mat = spsparse.csr_array((constructor_vals, (constructor_row_indices, constructor_col_indices)), shape=(H * W, H * W)) # this is A in MATLAB code
-
-    W_mat.setdiag(0)  # Zero diagonals? TODO not sure if there is an effect; doesn't seem like it
     W_mat_row_sum = W_mat.sum(axis=1)  # this is sumA in MATLAB code
     D = spsparse.diags(W_mat_row_sum, 0, shape=(H * W, H * W), format="csr")
+    # W_mat.setdiag(0)  # Zero diagonals? NO: do NOT set to zero; that's mathematically wrong. The MATLAB code of closed form is correct, and is also used here in Robust. The delta_{ij} terms exist.
     result = D - W_mat
+    # Technically this function can be further optimised by choosing to return RT_fragment and Lu directly, so we completely ignore constructing the Lk and R parts. That is done in the CPP code at https://github.com/wangchuan/RobustMatting/blob/f0d6144a800128a489e66cd2b5c5fb669c7a133c/src/robust_matting/robust_matting.cpp#L113. This is an avenue for further optimisation.
     return result
+
+
+def slow_distance_ratio_squared(c, f, b):
+    """
+    `c`: 1D length-C float array
+    `f`: 1D length-C float array
+    `b`: 1D length-C float array
+    """
+    divisor = (np.dot(f - b, f - b) + DIVISION_EPSILON)
+    alpha = np.dot(c - b, f - b) / divisor
+    numerator = c - (alpha * f + (1 - alpha) * b)
+    return np.dot(numerator, numerator) / divisor
+
+
+def slow_penalty_foreground(c, f, all_fs):
+    """
+    `c`: 1D length-C float array
+    `f`: 1D length-C float array
+    `all_fs`: (foreground_samples_count) x C float array
+    """
+    fi_minus_c = all_fs - c
+    DF_squared = np.min(np.sum(fi_minus_c * fi_minus_c, axis=1)) + DIVISION_EPSILON
+    return np.exp(-np.dot(f - c, f - c) / DF_squared)
+
+def slow_penalty_background(c, b, all_bs):
+    """
+    `c`: 1D length-C float array
+    `b`: 1D length-C float array
+    `all_bs`: (background_samples_count) x C float array
+    """
+    bj_minus_c = all_bs - c
+    DB_squared = np.min(np.sum(bj_minus_c * bj_minus_c, axis=1)) + DIVISION_EPSILON
+    return np.exp(-np.dot(b - c, b - c) / DB_squared)
+
+def slow_confidence_exparg(c, f, b, all_fs, all_bs, sigma_squared):
+    return -slow_distance_ratio_squared(c, f, b) * slow_penalty_foreground(c, f, all_fs) * slow_penalty_background(c, b, all_bs) / sigma_squared
 
 
 def solve_alpha(
@@ -284,7 +357,7 @@ def solve_alpha(
         foreground_samples_count=20,
         background_samples_count=20,
         sampling_method="deterministic_spread",
-        nearest_candidates_count=40,
+        nearest_candidates_count=200,
         sigma_squared=0.01,
         highest_confidence_pairs_to_select=3,
         epsilon=1e-5,
@@ -313,16 +386,12 @@ def solve_alpha(
     known_count = np.count_nonzero(~unknown_map)
 
     estimated_alphas = np.zeros((unknown_count, highest_confidence_pairs_to_select), dtype=float)  # row-major traversal of unknown pixels;  unknown_count x highest_confidence_pairs_to_select float array
-    estimated_confidences = np.zeros((unknown_count, highest_confidence_pairs_to_select), dtype=float)  # row-major traversal of unknown pixels;  unknown_count x highest_confidence_pairs_to_select float array
+    estimated_confidences_exparg = np.zeros((unknown_count, highest_confidence_pairs_to_select), dtype=float)  # row-major traversal of unknown pixels;  unknown_count x highest_confidence_pairs_to_select float array
 
-    if sampling_method == "local_random":
-        scheme_config = {"name": "local_random", "nearest_candidates_count": nearest_candidates_count}
+    if sampling_method in ("local_random", "deterministic_spread_local"):
+        scheme_config = {"name": sampling_method, "nearest_candidates_count": nearest_candidates_count}
     else:
         scheme_config = {"name": sampling_method}
-
-
-    # OVERRIDE
-    scheme_config = {"name": "global_random"}
 
     for i, (unknown_i, unknown_j) in enumerate(tqdm(
         zip(*unknown_map.nonzero()), total=np.count_nonzero(unknown_map),
@@ -330,7 +399,7 @@ def solve_alpha(
         disable=not logging.root.isEnabledFor(logging.INFO)
     )):  # row-major traversal of unknown pixels
         cT = I[unknown_i, unknown_j]
-        FiT, BjT = get_samples(
+        FiT, BjT, debug_Fx, debug_Fy, debug_Bx, debug_By = get_samples(
             foreground_boundary_is,
             foreground_boundary_js,
             foreground_boundary_pixels,
@@ -343,6 +412,16 @@ def solve_alpha(
             background_samples_count,
             scheme_config
         )
+
+        # DEBUG: display which pixel samples are chosen
+        # debug_chosen_pixels_plot = foreground_map.astype(float)
+        # debug_chosen_pixels_plot[unknown_map] = 0.5
+        # debug_chosen_pixels_plot[debug_Fx, debug_Fy] = 4
+        # debug_chosen_pixels_plot[debug_Bx, debug_By] = -3
+        # debug_chosen_pixels_plot[unknown_i, unknown_j] = 5
+        # skimage.io.imshow(debug_chosen_pixels_plot)
+        # skimage.io.show()
+
         # Names now in 2D world (what we are familiar with)
         cT_minus_FiT = cT - FiT  # foreground_samples_count x C float array
         cT_minus_FiT_squared = np.sum(cT_minus_FiT * cT_minus_FiT, axis=1)  # 1D length-foreground_samples_count float array
@@ -356,7 +435,7 @@ def solve_alpha(
         Fi_minus_Bj_3D = (np.repeat(FiT, background_samples_count, axis=0) - np.tile(BjT, (foreground_samples_count, 1)))[:, :, np.newaxis]  # (foreground_samples_count * background_samples_count) x C x 1 float array
         FiT_minus_BjT_3D = np.transpose(Fi_minus_Bj_3D, (0, 2, 1))  # (foreground_samples_count * background_samples_count) x 1 x C float array
         Fi_minus_Bj_squared_3D = FiT_minus_BjT_3D @ Fi_minus_Bj_3D + DIVISION_EPSILON # (foreground_samples_count * background_samples_count) x 1 x 1 float array
-        alpha_premultiplier_3D = FiT_minus_BjT_3D / Fi_minus_Bj_squared_3D  # this subexpression is named, as it's useful again later when estimating alphas (see estimated_alphas variable)
+        alpha_premultiplier_3D = FiT_minus_BjT_3D / Fi_minus_Bj_squared_3D  # this subexpression is named, as it's useful again later when estimating alphas (see estimated_alphas variable);  (foreground_samples_count * background_samples_count) x 1 x C float array
         Aij_3D = \
             (
                 np.tile(np.eye(3).reshape(1, 3, 3), (foreground_samples_count * background_samples_count, 1, 1)) \
@@ -365,21 +444,71 @@ def solve_alpha(
         c_minus_Bj_3D = np.tile(cT_minus_BjT, (foreground_samples_count, 1))[:, :, np.newaxis] # (foreground_samples_count * background_samples_count) x C x 1 float array
         cT_minus_BjT_3D = np.transpose(c_minus_Bj_3D, (0, 2, 1))  # (foreground_samples_count * background_samples_count) x 1 x C float array
 
-        confidences = -np.squeeze(cT_minus_BjT_3D @ Aij_3D @ c_minus_Bj_3D) * penalty_foreground_background / sigma_squared # 1D length-(foreground_samples_count * background_samples_count) float array
+        confidences_exparg = -np.squeeze(cT_minus_BjT_3D @ Aij_3D @ c_minus_Bj_3D) * penalty_foreground_background / sigma_squared # 1D length-(foreground_samples_count * background_samples_count) float array
 
-        highest_confidence_argsort = np.argsort(confidences)[-highest_confidence_pairs_to_select:]
-        # means and exponentiations are taken later at top level for efficiency
+        # DEBUG: correctness of above computation of confidences (before zeroing those of nonsensical alphas) (WARNING, this code slows down computation by a TON)
+        # debug_slow_confidences_exparg = []
+        # for i in range(foreground_samples_count):
+        #     for j in range(background_samples_count):
+        #         debug_slow_confidences_exparg.append(
+        #             slow_confidence_exparg(cT, FiT[i], BjT[j], FiT, BjT, sigma_squared)
+        #         )
+        # debug_slow_confidences_exparg = np.array(debug_slow_confidences_exparg)
+        # assert np.allclose(confidences_exparg, debug_slow_confidences_exparg)
+
+        # Courtesy of https://github.com/wangchuan/RobustMatting/blob/f0d6144a800128a489e66cd2b5c5fb669c7a133c/src/robust_matting/robust_matting.cpp#L266
+        alphas = np.squeeze(alpha_premultiplier_3D @ c_minus_Bj_3D) # 1D length-(foreground_samples_count * background_samples_count) float array; need to compute alphas now to zero out confidence values for nonsensical alphas outside of tolerance range (-0.05, 1.05)
+        erroneous_alpha_map = (alphas < 0.05) | (alphas > 1.05)
+        confidences_exparg[erroneous_alpha_map] = -np.inf
+
+        # DEBUG: Visualise values
+        # import matplotlib.pyplot as plt
+        # fig, ax = plt.subplots()
+        # ax.plot(np.arange(len(alphas)), alphas)
+        # ax.set_title("alphas")
+        # plt.show()
+        #
+        # fig, ax = plt.subplots()
+        # ax.plot(np.arange(len(confidences_exparg)), confidences_exparg)
+        # ax.set_title("confidences_exparg")
+        # plt.show()
+        #
+        # debug_confidence_exparg_descending = confidences_exparg[np.argsort(confidences_exparg)[::-1]]
+        # fig, ax = plt.subplots()
+        # ax.plot(np.arange(len(debug_confidence_exparg_descending)), debug_confidence_exparg_descending)
+        # ax.set_title("debug_confidence_exparg_descending")
+        # plt.show()
+        #
+        # debug_confidence_descending = np.exp(debug_confidence_exparg_descending)
+        # fig, ax = plt.subplots()
+        # ax.plot(np.arange(len(debug_confidence_descending)), debug_confidence_descending)
+        # ax.set_ylim((0, 1))
+        # ax.set_title("debug_confidence_descending")
+        # plt.show()
+
+        highest_confidence_argsort = np.argsort(confidences_exparg)[-highest_confidence_pairs_to_select:]
+        # means and exponentiations are taken later at top level for efficiency. Also, exponentiation causes most values to become 1, which makes the procedure of sorting then taking the highest confidence pairs less meaningful: many pairs will have the maximal confidence of 1.
         estimated_alphas[i, :] = (alpha_premultiplier_3D[highest_confidence_argsort, :, :] @ c_minus_Bj_3D[highest_confidence_argsort, :, :]).squeeze()  # 1D length-(highest_confidence_pairs_to_select) float array
-        estimated_confidences[i, :] = confidences[highest_confidence_argsort]  # 1D length-(highest_confidence_pairs_to_select) float array
+        estimated_confidences_exparg[i, :] = confidences_exparg[highest_confidence_argsort]  # 1D length-(highest_confidence_pairs_to_select) float array
 
     estimated_alphas = np.mean(estimated_alphas, axis=1)  # row-major traversal of unknown pixels;  1D length-(unknown_count) float array
-    estimated_confidences = np.mean(np.exp(estimated_confidences), axis=1)  # row-major traversal of unknown pixels;  1D length-(unknown_count) float array
+    estimated_confidences = np.mean(np.exp(estimated_confidences_exparg), axis=1)  # row-major traversal of unknown pixels;  1D length-(unknown_count) float array
+
+    # DEBUG: Show confidences
+    # debug_confidence_map = np.ones((H, W)) * -0.5
+    # debug_confidence_map[unknown_map] = estimated_confidences
+    # print("Showing debug_confidence_map")
+    # skimage.io.imshow(debug_confidence_map)
+    # skimage.io.show()
 
     estimated_result = foreground_map.astype(float)  # H x W float array
     estimated_result[unknown_map] = estimated_alphas
-    estimated_result = np.clip(estimated_result, 0, 1)
-    print("Showing estimated result")
-    skimage.io.imshow(estimated_result)
+    logging.debug(f"np.min(estimated_result) = {np.min(estimated_result)}")
+    logging.debug(f"np.min(estimated_result) = {np.max(estimated_result)}")
+    estimated_result = np.clip(estimated_result, -0.05, 1.05)  # TODO: Evaluate effectiveness of treating nonsensical alphas at this stage
+    logging.debug(f"Clipping estimated_result to [-0.05, 1.05] range")
+    logging.info("Showing estimated result (estimated alphas)")
+    skimage.io.imshow(np.clip(estimated_result, 0, 1))
     skimage.io.show()
 
     indices = np.arange(H * W).reshape((H, W))  # row-major
@@ -390,13 +519,14 @@ def solve_alpha(
     index_displacement_map[known_indices_rowmaj] = np.arange(known_count)
     index_displacement_map[unknown_indices_rowmaj] = known_count + np.arange(unknown_count)
 
-    WiF = gamma * (estimated_confidences * estimated_alphas + (1 - estimated_confidences) * (estimated_alphas > 0.5).astype(int))  # row-major traversal of unknown pixels;  1D length-(unknown_count) float array
-    WiB = gamma * (estimated_confidences * (1 - estimated_alphas) + (1 - estimated_confidences) * (estimated_alphas < 0.5).astype(int))  # row-major traversal of unknown pixels;  1D length-(unknown_count) float array
-    L = get_laplacian(I, epsilon, window_size, index_displacement_map).tolil()  # H x W sparse-LIL float matrix. LIL format required for fancy indexing and still retaining sparse format
+    WiF = -gamma * (estimated_confidences * estimated_alphas + (1 - estimated_confidences) * (estimated_alphas > 0.5).astype(int))  # row-major traversal of unknown pixels;  1D length-(unknown_count) float array
+    WiB = -gamma * (estimated_confidences * (1 - estimated_alphas) + (1 - estimated_confidences) * (estimated_alphas <= 0.5).astype(int))  # row-major traversal of unknown pixels;  1D length-(unknown_count) float array
+    L = get_laplacian(I, ~unknown_map, epsilon, window_size, index_displacement_map).tolil()  # H x W sparse-LIL float matrix. LIL format required for fancy indexing and still retaining sparse format
 
     RT_fragment = L[known_count:, :known_count]  # a little slow
     RT = spsparse.hstack((WiF.reshape(-1, 1), WiB.reshape(-1, 1), RT_fragment), format="csr")
     Lu = L[known_count:, known_count:].reshape(unknown_count, unknown_count).tocsr()
+    Lu.setdiag(Lu.diagonal() + gamma)
     result = foreground_map.astype(float)  # H x W float array
     Ak = np.concatenate(([1, 0], result[~unknown_map]))
     negative_RT_Ak = -RT @ Ak
