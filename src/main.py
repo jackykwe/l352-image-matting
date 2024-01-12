@@ -67,8 +67,8 @@ if __name__ == "__main__":
 
         logging.info(f"Opening {args.scribble_path}")
         I_scribble = skimage.io.imread(args.scribble_path) / 255 # this is mI in MATLAB code
-        assert I_scribble.shape == I.shape, f"Shapes of scribble image ({I_scribble.shape}) and image ({I.shape}) don't match"
-        I_scribble_gray2D = closedform.utils.matlab_compatible_rgb2gray(I_scribble) if I.shape[2] == 3 else I_scribble  # H x W array
+        assert I_scribble.shape[:2] == I.shape[:2], f"Shapes of scribble image ({I_scribble.shape[:2]}) and image ({I.shape[:2]}) don't match"
+        I_scribble_gray2D = closedform.utils.matlab_compatible_rgb2gray(I_scribble) if len(I_scribble.shape) == 3 else I_scribble  # H x W array
         if args.trimap_mode:
             constrained_map = np.isclose(I_scribble_gray2D, 0, atol=1e-3) | np.isclose(I_scribble_gray2D, 1, atol=1e-3)
             constrained_map = spndimage.binary_erosion(constrained_map, np.ones((1 + 2 * args.trimap_erosion_window_size, 1 + 2
@@ -95,8 +95,8 @@ if __name__ == "__main__":
 
         logging.info(f"Opening {args.trimap_path}")
         I_trimap = skimage.io.imread(args.trimap_path) / 255 # this is mI in MATLAB code
-        assert I_trimap.shape == I.shape, f"Shapes of trimap image ({I_trimap.shape}) and image ({I.shape}) don't match"
-        I_trimap_gray2D = closedform.utils.matlab_compatible_rgb2gray(I_trimap) if I.shape[2] == 3 else I_trimap  # H x W array
+        assert I_trimap.shape[:2] == I.shape[:2], f"Shapes of trimap image ({I_trimap.shape[:2]}) and image ({I.shape[:2]}) don't match"
+        I_trimap_gray2D = closedform.utils.matlab_compatible_rgb2gray(I_trimap) if len(I_trimap.shape) == 3 else I_trimap  # H x W array
 
         foreground_map = np.absolute(I_trimap_gray2D - 1) < 1e-3  # H x W bool array
         background_map = np.absolute(I_trimap_gray2D) < 1e-3  # H x W bool array
