@@ -109,7 +109,7 @@ if __name__ == "__main__":
         # skimage.io.imshow(unknown_map)
         # skimage.io.show()
 
-        alpha = robust.entry.solve_alpha(
+        alpha = robust.entry.solve_alpha2(
             I,
             foreground_map,
             background_map,

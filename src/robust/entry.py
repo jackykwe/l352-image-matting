@@ -203,15 +203,15 @@ def solve_alpha(
         foreground_map,
         background_map,
         unknown_map,
-        foreground_samples_count=20,
-        background_samples_count=20,
-        sampling_method="deterministic_spread",
-        nearest_candidates_count=200,
-        sigma_squared=0.01,
-        highest_confidence_pairs_to_select=3,
-        epsilon=1e-5,
-        gamma=0.1,
-        window_size=1
+        foreground_samples_count,
+        background_samples_count,
+        sampling_method,
+        nearest_candidates_count,
+        sigma_squared,
+        highest_confidence_pairs_to_select,
+        epsilon,
+        gamma,
+        window_size
     ):
     """
     `I`: H x W x C float array
@@ -248,6 +248,7 @@ def solve_alpha(
         disable=not logging.root.isEnabledFor(logging.INFO)
     )):  # row-major traversal of unknown pixels
         cT = I[unknown_i, unknown_j]
+        # t0 = time.time_ns()
         FiT, BjT, debug_Fx, debug_Fy, debug_Bx, debug_By = sampling.get_samples(
             foreground_boundary_is,
             foreground_boundary_js,
@@ -261,6 +262,218 @@ def solve_alpha(
             background_samples_count,
             scheme_config
         )
+        # t1 = time.time_ns()
+        # DEBUG: display which pixel samples are chosen
+        # debug_chosen_pixels_plot = foreground_map.astype(float)
+        # debug_chosen_pixels_plot[unknown_map] = 0.5
+        # debug_chosen_pixels_plot[debug_Fx, debug_Fy] = 4
+        # debug_chosen_pixels_plot[debug_Bx, debug_By] = -3
+        # debug_chosen_pixels_plot[unknown_i, unknown_j] = 5
+        # skimage.io.imshow(debug_chosen_pixels_plot)
+        # skimage.io.show()
+
+        # Names now in 2D world (what we are familiar with)
+        cT_minus_FiT = cT - FiT  # foreground_samples_count x C float array
+        cT_minus_FiT_squared = np.sum(cT_minus_FiT * cT_minus_FiT, axis=1)  # 1D length-foreground_samples_count float array
+        penalty_foreground_exparg = -cT_minus_FiT_squared / (np.min(cT_minus_FiT_squared) + DIVISION_EPSILON)  # this is dividing by D_F^2;  # 1D length-foreground_samples_count float array
+        cT_minus_BjT = cT - BjT   # background_samples_count x C float array
+        cT_minus_BjT_squared = np.sum(cT_minus_BjT * cT_minus_BjT, axis=1)  # 1D length-background_samples_count float array
+        penalty_background_exparg = -cT_minus_BjT_squared / (np.min(cT_minus_BjT_squared) + DIVISION_EPSILON)  # this is dividing by D_B^2;  # 1D length-background_samples_count float array
+        penalty_foreground_background = np.exp(np.repeat(penalty_foreground_exparg, background_samples_count) + np.tile(penalty_background_exparg, foreground_samples_count))  # 1D length-(foreground_samples_count * background_samples_count) float array
+
+        # Names now in 3D
+        Fi_minus_Bj_3D = (np.repeat(FiT, background_samples_count, axis=0) - np.tile(BjT, (foreground_samples_count, 1)))[:, :, np.newaxis]  # (foreground_samples_count * background_samples_count) x C x 1 float array
+        FiT_minus_BjT_3D = np.transpose(Fi_minus_Bj_3D, (0, 2, 1))  # (foreground_samples_count * background_samples_count) x 1 x C float array
+        Fi_minus_Bj_squared_3D = FiT_minus_BjT_3D @ Fi_minus_Bj_3D + DIVISION_EPSILON # (foreground_samples_count * background_samples_count) x 1 x 1 float array
+        alpha_premultiplier_3D = FiT_minus_BjT_3D / Fi_minus_Bj_squared_3D  # this subexpression is named, as it's useful again later when estimating alphas (see estimated_alphas variable);  (foreground_samples_count * background_samples_count) x 1 x C float array
+        Aij_3D = \
+            (
+                np.tile(np.eye(3).reshape(1, 3, 3), (foreground_samples_count * background_samples_count, 1, 1)) \
+                - (Fi_minus_Bj_3D @ alpha_premultiplier_3D)
+            ) / Fi_minus_Bj_squared_3D  # (foreground_samples_count * background_samples_count) x C x C float array
+        c_minus_Bj_3D = np.tile(cT_minus_BjT, (foreground_samples_count, 1))[:, :, np.newaxis] # (foreground_samples_count * background_samples_count) x C x 1 float array
+        cT_minus_BjT_3D = np.transpose(c_minus_Bj_3D, (0, 2, 1))  # (foreground_samples_count * background_samples_count) x 1 x C float array
+
+        confidences_exparg = -np.squeeze(cT_minus_BjT_3D @ Aij_3D @ c_minus_Bj_3D) * penalty_foreground_background / sigma_squared # 1D length-(foreground_samples_count * background_samples_count) float array
+
+        # DEBUG: correctness of above computation of confidences (before zeroing those of nonsensical alphas) (WARNING, this code slows down computation by a TON)
+        # debug_slow_confidences_exparg = []
+        # for i in range(foreground_samples_count):
+        #     for j in range(background_samples_count):
+        #         debug_slow_confidences_exparg.append(
+        #             slowmetrics.slow_confidence_exparg(cT, FiT[i], BjT[j], FiT, BjT, sigma_squared)
+        #         )
+        # debug_slow_confidences_exparg = np.array(debug_slow_confidences_exparg)
+        # assert np.allclose(confidences_exparg, debug_slow_confidences_exparg)
+
+        # Courtesy of https://github.com/wangchuan/RobustMatting/blob/f0d6144a800128a489e66cd2b5c5fb669c7a133c/src/robust_matting/robust_matting.cpp#L266
+        alphas = np.squeeze(alpha_premultiplier_3D @ c_minus_Bj_3D) # 1D length-(foreground_samples_count * background_samples_count) float array; need to compute alphas now to zero out confidence values for nonsensical alphas outside of tolerance range (-0.05, 1.05)
+        erroneous_alpha_map = (alphas < 0.05) | (alphas > 1.05)
+        confidences_exparg[erroneous_alpha_map] = -np.inf
+
+        # DEBUG: Visualise values
+        # import matplotlib.pyplot as plt
+        # fig, ax = plt.subplots()
+        # ax.plot(np.arange(len(alphas)), alphas)
+        # ax.set_title("alphas")
+        # plt.show()
+        #
+        # fig, ax = plt.subplots()
+        # ax.plot(np.arange(len(confidences_exparg)), confidences_exparg)
+        # ax.set_title("confidences_exparg")
+        # plt.show()
+        #
+        # debug_confidence_exparg_descending = confidences_exparg[np.argsort(confidences_exparg)[::-1]]
+        # fig, ax = plt.subplots()
+        # ax.plot(np.arange(len(debug_confidence_exparg_descending)), debug_confidence_exparg_descending)
+        # ax.set_title("debug_confidence_exparg_descending")
+        # plt.show()
+        #
+        # debug_confidence_descending = np.exp(debug_confidence_exparg_descending)
+        # fig, ax = plt.subplots()
+        # ax.plot(np.arange(len(debug_confidence_descending)), debug_confidence_descending)
+        # ax.set_ylim((0, 1))
+        # ax.set_title("debug_confidence_descending")
+        # plt.show()
+
+        highest_confidence_argsort = np.argsort(confidences_exparg)[-highest_confidence_pairs_to_select:]
+        # means and exponentiations are taken later at top level for efficiency. Also, exponentiation causes most values to become 1, which makes the procedure of sorting then taking the highest confidence pairs less meaningful: many pairs will have the maximal confidence of 1.
+        estimated_alphas[i, :] = (alpha_premultiplier_3D[highest_confidence_argsort, :, :] @ c_minus_Bj_3D[highest_confidence_argsort, :, :]).squeeze()  # 1D length-(highest_confidence_pairs_to_select) float array
+        estimated_confidences_exparg[i, :] = confidences_exparg[highest_confidence_argsort]  # 1D length-(highest_confidence_pairs_to_select) float array
+
+        # t2 = time.time_ns()
+        # print(f"{t1-t0} {t2-t1}")
+
+    estimated_alphas = np.mean(estimated_alphas, axis=1)  # row-major traversal of unknown pixels;  1D length-(unknown_count) float array
+    estimated_confidences = np.mean(np.exp(estimated_confidences_exparg), axis=1)  # row-major traversal of unknown pixels;  1D length-(unknown_count) float array
+
+    # DEBUG: Show confidences
+    # debug_confidence_map = np.ones((H, W)) * -0.5
+    # debug_confidence_map[unknown_map] = estimated_confidences
+    # print("Showing debug_confidence_map")
+    # skimage.io.imshow(debug_confidence_map)
+    # skimage.io.show()
+
+    estimated_result = foreground_map.astype(float)  # H x W float array
+    estimated_result[unknown_map] = estimated_alphas
+    logging.debug(f"np.min(estimated_result) = {np.min(estimated_result)}")
+    logging.debug(f"np.min(estimated_result) = {np.max(estimated_result)}")
+    estimated_result = np.clip(estimated_result, -0.05, 1.05)  # TODO: Evaluate effectiveness of treating nonsensical alphas at this stage
+    logging.debug(f"Clipping estimated_result to [-0.05, 1.05] range")
+    # logging.info("Showing estimated result (estimated alphas)")
+    # skimage.io.imshow(np.clip(estimated_result, 0, 1))
+    # skimage.io.show()
+
+    indices = np.arange(H * W).reshape((H, W))  # row-major
+    unknown_indices_rowmaj = indices[unknown_map]  # row-major traversal of unknown pixels;  1D length-(unknown_count) int array
+    known_indices_rowmaj = indices[~unknown_map]  # row-major traversal of known pixels;  1D length-(known_count) int array
+
+    index_displacement_map = np.zeros(H * W, dtype=int)
+    index_displacement_map[known_indices_rowmaj] = np.arange(known_count)
+    index_displacement_map[unknown_indices_rowmaj] = known_count + np.arange(unknown_count)
+
+    WiF = -gamma * (estimated_confidences * estimated_alphas + (1 - estimated_confidences) * (estimated_alphas > 0.5).astype(int))  # row-major traversal of unknown pixels;  1D length-(unknown_count) float array
+    WiB = -gamma * (estimated_confidences * (1 - estimated_alphas) + (1 - estimated_confidences) * (estimated_alphas <= 0.5).astype(int))  # row-major traversal of unknown pixels;  1D length-(unknown_count) float array
+    L = get_laplacian(I, ~unknown_map, epsilon, window_size, index_displacement_map).tolil()  # H x W sparse-LIL float matrix. LIL format required for fancy indexing and still retaining sparse format
+    RT_fragment = L[known_count:, :known_count]  # a little slow
+    Lu = L[known_count:, known_count:].reshape(unknown_count, unknown_count).tocsr()
+
+    # # Variables prefixed with R_ mirror robust_matting.cpp
+    # R_Lu, R_RT0 = referenceimpl_get_Lu_RT(I, ~unknown_map, epsilon, window_size, index_displacement_map)  # using CPP-like code which doesn't construct entire L. May be useful if memory becomes a constraint, though this runs slightly more slowly. Results are identical.
+    # print(F"sparse_allclose(RT_fragment, R_RT0) = {utils.sparse_allclose(RT_fragment, R_RT0, 'RT_fragment', 'R_RT0')}")
+    # print(F"sparse_allclose(Lu, R_Lu) = {utils.sparse_allclose(Lu, R_Lu, 'Lu', 'R_Lu')}")
+
+    RT = spsparse.hstack((WiF.reshape(-1, 1), WiB.reshape(-1, 1), RT_fragment), format="csr")
+    Lu.setdiag(Lu.diagonal() + gamma)
+    result = foreground_map.astype(float)  # H x W float array
+    Ak = np.concatenate(([1, 0], result[~unknown_map]))
+    negative_RT_Ak = -RT @ Ak
+
+    solved_alphas, result_code = spsparselinalg.cg(Lu, negative_RT_Ak)
+    assert result_code == 0, f"Conjugate Gradient did not successfully exit, got result code {result_code} (expected 0)"
+
+    result[unknown_map] = solved_alphas  # there tends to be some alphas that lie outside of [0, 1]...
+    return result
+
+
+# About 25% faster but lacks flexibility of sampling method selection...
+def solve_alpha2(
+        I,
+        foreground_map,
+        background_map,
+        unknown_map,
+        foreground_samples_count,
+        background_samples_count,
+        sampling_method,
+        nearest_candidates_count,
+        sigma_squared,
+        highest_confidence_pairs_to_select,
+        epsilon,
+        gamma,
+        window_size
+    ):
+    """
+    `I`: H x W x C float array
+    `foreground_map`: H x W bool array
+    `background_map`: H x W bool array
+    `unknown_map`: H x W bool array
+
+    Returns: H x W float array
+    """
+    H, W, C = I.shape
+
+    unknown_map_dilated = spndimage.binary_dilation(unknown_map, np.ones((3, 3)))
+    unknown_count = np.count_nonzero(unknown_map)
+    known_count = np.count_nonzero(~unknown_map)
+
+    foreground_boundary_map = foreground_map & unknown_map_dilated  # H x W bool array
+    foreground_boundary_ijs = np.transpose(foreground_boundary_map.nonzero())  # foreground_boundary_count x 2 int array
+    foreground_boundary_is, foreground_boundary_js = foreground_boundary_map.nonzero()  # each a 1D length-(foreground_boundary_count) int array
+    foreground_boundary_count = len(foreground_boundary_ijs)
+    foreground_boundary_pixels = I[foreground_boundary_map]  # foreground_boundary_count x C float array
+    background_boundary_map = background_map & unknown_map_dilated  # H x W bool array
+    background_boundary_ijs = np.transpose(background_boundary_map.nonzero())  # background_boundary_count x 2 int array
+    background_boundary_is, background_boundary_js = background_boundary_map.nonzero()  # each a 1D length-(background_boundary_count) int array
+    background_boundary_count = len(background_boundary_ijs)
+    background_boundary_pixels = I[background_boundary_map]  # background_boundary_count x C float array
+
+    estimated_alphas = np.zeros((unknown_count, highest_confidence_pairs_to_select), dtype=float)  # row-major traversal of unknown pixels;  unknown_count x highest_confidence_pairs_to_select float array
+    estimated_confidences_exparg = np.zeros((unknown_count, highest_confidence_pairs_to_select), dtype=float)  # row-major traversal of unknown pixels;  unknown_count x highest_confidence_pairs_to_select float array
+
+    foreground_argsort_indexer = np.arange(foreground_samples_count) * (nearest_candidates_count // foreground_samples_count)
+    background_argsort_indexer = np.arange(background_samples_count) * (nearest_candidates_count // background_samples_count)
+
+    # foreground_boundary_is2 = foreground_boundary_is + (H - 1)  # 1D length-(foreground_boundary_count) int array
+    # foreground_boundary_js2 = foreground_boundary_js + (W - 1)  # 1D length-(foreground_boundary_count) int array
+    # background_boundary_is2 = background_boundary_is + (H - 1)  # 1D length-(background_boundary_count) int array
+    # background_boundary_js2 = background_boundary_js + (W - 1)  # 1D length-(background_boundary_count) int array
+    # manhattan_distance_grid = spsd.cdist(
+    #     np.hstack((
+    #         np.repeat(np.arange(2 * H - 1), 2 * W - 1).reshape(-1, 1),
+    #         np.tile(np.arange(2 * W - 1), 2 * H - 1).reshape(-1, 1)
+    #     )),  # (2H-1) x (2W-1) x 2 int array
+    #     np.array([[H - 1, W - 1]]),
+    #     metric="cityblock"  # manhattan distance
+    # ).reshape(2 * H - 1 , 2 * W - 1)
+        # LATER...
+        # foreground_manhattan_distances2 = manhattan_distance_grid[foreground_boundary_is2 - unknown_i, foreground_boundary_js2 - unknown_j]
+        # background_manhattan_distances2 = manhattan_distance_grid[background_boundary_is2 - unknown_i, background_boundary_js2 - unknown_j]
+
+
+    for i, unknown_ij in enumerate(tqdm(
+        np.transpose(unknown_map.nonzero()), total=np.count_nonzero(unknown_map),
+        desc="Obtaining pixel samples and confidences for each unknown pixel",
+        disable=not logging.root.isEnabledFor(logging.INFO)
+    )):  # row-major traversal of unknown pixels
+        cT = I[*unknown_ij]
+        foreground_manhattan_distances = np.sum(np.absolute(foreground_boundary_ijs - unknown_ij), axis=1)  # of foreground boundary pixels from unknown_ij
+        background_manhattan_distances = np.sum(np.absolute(background_boundary_ijs - unknown_ij), axis=1)  # of background boundary pixels from unknown_ij
+        foreground_indexer = np.argsort(foreground_manhattan_distances, kind="stable")
+        background_indexer = np.argsort(background_manhattan_distances, kind="stable")
+        foreground_indexer = foreground_indexer[foreground_argsort_indexer]
+        background_indexer = background_indexer[background_argsort_indexer]
+        FiT = foreground_boundary_pixels[foreground_indexer]
+        BjT = background_boundary_pixels[background_indexer]
 
         # DEBUG: display which pixel samples are chosen
         # debug_chosen_pixels_plot = foreground_map.astype(float)
