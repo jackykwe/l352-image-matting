@@ -2,6 +2,7 @@ import argparse
 import logging
 
 import numpy as np
+import scipy.ndimage as spndimage
 import skimage
 
 import closedform.coarsetofine
@@ -29,6 +30,8 @@ if __name__ == "__main__":
 
     closed_form_parser = subparsers.add_parser("closedform")
     closed_form_parser.add_argument("-i", "--image-path", type=str, help="Path to original image", required=True)
+    closed_form_parser.add_argument("-t", "--trimap-mode", action="store_true", help="Use this flag is a trimap is provided via -s/--scribble-path. Erosion on the trimap will be performed to obtain a \"scribble\".")
+    closed_form_parser.add_argument("-T", "--trimap-erosion-window-size", type=int, default=0, help="One-sided window size to be used as a square kernel for erosion of the trimap. If 0, no erosion is performed. (default: %(default)s)")
     closed_form_parser.add_argument("-s", "--scribble-path", type=str, help="Path to scribble", required=True)
     closed_form_parser.add_argument("-a", "--alpha-threshold", type=float, default=0.02, help="Alpha values within this close to 0 and 1 are pushed to 0 and 1 respectively (default: %(default)s)")
     closed_form_parser.add_argument("-e", "--epsilon", type=float, default=1e-7, help="Epsilon parameter (default: %(default)s)")
@@ -66,9 +69,13 @@ if __name__ == "__main__":
         I_scribble = skimage.io.imread(args.scribble_path) / 255 # this is mI in MATLAB code
         assert I_scribble.shape == I.shape, f"Shapes of scribble image ({I_scribble.shape}) and image ({I.shape}) don't match"
         I_scribble_gray2D = closedform.utils.matlab_compatible_rgb2gray(I_scribble) if I.shape[2] == 3 else I_scribble  # H x W array
-        I_scribble = closedform.utils.ensure_3d_image(I_scribble)  # H x W x C array
-
-        constrained_map = (np.sum(np.absolute(I - I_scribble), axis=2) > 1e-3).astype(float)  # this is consts_map in MATLAB; H x W array
+        if args.trimap_mode:
+            constrained_map = np.isclose(I_scribble_gray2D, 0, atol=1e-3) | np.isclose(I_scribble_gray2D, 1, atol=1e-3)
+            constrained_map = spndimage.binary_erosion(constrained_map, np.ones((1 + 2 * args.trimap_erosion_window_size, 1 + 2
+            * args.trimap_erosion_window_size))).astype(float)
+        else:
+            I_scribble = closedform.utils.ensure_3d_image(I_scribble)  # H x W x C array
+            constrained_map = (np.sum(np.absolute(I - I_scribble), axis=2) > 1e-3).astype(float)  # this is consts_map in MATLAB; H x W array
         constrained_vals = I_scribble_gray2D * constrained_map  # NB. * is the element-wise multiply operator; H x W array
 
         alpha = closedform.coarsetofine.solve_alpha_coarse_to_fine(
