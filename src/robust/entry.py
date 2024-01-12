@@ -6,14 +6,12 @@ import scipy.linalg as splinalg
 import scipy.ndimage as spndimage
 import scipy.sparse as spsparse
 import scipy.sparse.linalg as spsparselinalg
-import skimage
 from tqdm.auto import tqdm
 
-from . import sampling
+from . import sampling, utils
 from .utils import DIVISION_EPSILON
 
 # from . import slowmetrics  # for debugging only
-
 
 def get_laplacian(I, constrained_map, epsilon, window_size, index_displacement_map):
     """
@@ -29,12 +27,11 @@ def get_laplacian(I, constrained_map, epsilon, window_size, index_displacement_m
     H, W, C = I.shape
     # constrain a pixel iff all pixels in its neighbourhood are also constrained. For these centres, no need to enforce linear colour model,
     # so we omit summing them. Remember the alphaT L alpha term is there to enforce the smoothness/linear colour models.
+    # I believe for these centres, the linear model is trivially satisfied and so no loss.
     constrained_map = spndimage.binary_erosion(constrained_map, np.ones((1 + 2 * window_size, 1 + 2 * window_size))).astype(int)
 
     indices = np.arange(H * W).reshape((H, W))  # row-major
-    # temp_length is the number of window centres (excluding a strip of width window_size around image) that we need to sum
-    # i.e. those whose neighbourhoods contain at least one unconstrained pixel
-    constructor_length = np.sum(1 - constrained_map[window_size:-window_size, window_size:-window_size]) * neighbourhood_size_squared  # this is tlen in MATLAB code; this is the length of the arguments to sp.sparse.csr_matrix(). Here in Python we also exploit the feature of csr_matrix() that accumulates values of duplicated indices
+    constructor_length = np.sum(1 - constrained_map[window_size:-window_size, window_size:-window_size]) * neighbourhood_size_squared  # this is tlen in MATLAB code; this is the length of the arguments to sp.sparse.csr_matrix(). Here in Python we also exploit the feature of csr_matrix() that accumulates values of duplicated indices. Each window contributes neighbourhood_size_squared values to the sparse matrix.
 
     # These three are arguments to the sp.sparse.csr_matrix() sparse matrix constructor
     constructor_row_indices = np.zeros(constructor_length)
@@ -54,11 +51,11 @@ def get_laplacian(I, constrained_map, epsilon, window_size, index_displacement_m
 
             window_indices = indices[i - window_size:i + window_size + 1, j - window_size:j + window_size + 1].flatten()  # row-major
             # NB. The following (window_I) is the matrix A_{(k)} in my proof
-            window_I = I[i - window_size:i + window_size + 1, j - window_size:j + window_size + 1, :].reshape((neighbourhood_size, C))  # row-major
+            window_I = I[i - window_size:i + window_size + 1, j - window_size:j + window_size + 1, :].reshape((neighbourhood_size, C))  # row-major; neighbourhood_size x C float array
             # NB. The following (window_mu) is the vector \mu_{(k)} in my proof
-            window_mu = np.mean(window_I, axis=0).reshape(-1, 1)  # sum columns; C x 1 vector
+            window_mu = np.mean(window_I, axis=0).reshape(-1, 1)  # sum columns; C x 1 float array
             # NB. The following (window_var) is the matrix (\Sigma_{(k)} + \frac{\epsilon}{M^2} I_{CxC})^{-1} in my proof
-            window_var = splinalg.inv((window_I.T @ window_I) / neighbourhood_size - window_mu @ window_mu.T + epsilon / neighbourhood_size * np.eye(C))
+            window_var = splinalg.inv((window_I.T @ window_I) / neighbourhood_size - window_mu @ window_mu.T + epsilon / neighbourhood_size * np.eye(C))  # C x C float array
             window_I = window_I - npmatlib.repmat(window_mu.T, neighbourhood_size, 1)
             # NB. The following (temp_vals) is the 1/M^2 * (1 + (...)^T (...)^{-1} (...)) scalar term for (k)
             # to be used in the computation of Laplacian matrix elements for all M^2 x M^2 possible
@@ -79,6 +76,128 @@ def get_laplacian(I, constrained_map, epsilon, window_size, index_displacement_m
     result = D - W_mat
     # Technically this function can be further optimised by choosing to return RT_fragment and Lu directly, so we completely ignore constructing the Lk and R parts. That is done in the CPP code at https://github.com/wangchuan/RobustMatting/blob/f0d6144a800128a489e66cd2b5c5fb669c7a133c/src/robust_matting/robust_matting.cpp#L113. This is an avenue for further optimisation.
     return result
+
+
+
+
+
+def referenceimpl_get_Lu_RT(I, constrained_map, epsilon, window_size, index_displacement_map):
+    """
+    `I`: H x W x C array
+    `constrained_map`: H x W bool array
+
+    Returns:
+    ```
+    (
+        unknown_count x unknown_count sparse float array  # this is Lu
+        unknown_count x known_count sparse float array  # this is RT0
+    )
+    ```
+    """
+    unknown_count = np.count_nonzero(~constrained_map)
+    known_count = np.count_nonzero(constrained_map)
+
+    # Lu = spsparse.lil_array((unknown_count, unknown_count), dtype=float)  # unknown_count x unknown_count float sparse array
+    # RT0 = spsparse.lil_array((unknown_count, known_count), dtype=float)  # unknown_count x known_count float sparse array
+    # # RT1: unknown_count x 2 float sparse array
+
+    neighbourhood_size = (1 + 2 * window_size) ** 2
+    H, W, C = I.shape
+    constrained_map = spndimage.binary_erosion(constrained_map, np.ones((1 + 2 * window_size, 1 + 2 * window_size))).astype(int)
+
+    indices = np.arange(H * W).reshape((H, W))  # row-major
+
+    Lu_constructor_row_indices = []
+    Lu_constructor_col_indices = []
+    Lu_constructor_vals = []
+    RT0_constructor_row_indices = []
+    RT0_constructor_col_indices = []
+    RT0_constructor_vals = []
+
+    for i in tqdm(
+        range(window_size, H - window_size),
+        desc=f"Generating Lu and RT0",
+        disable=not logging.root.isEnabledFor(logging.INFO)
+    ):
+        for j in range(window_size, W - window_size):
+            # (i, j) represents a particular window centre k
+            if constrained_map[i, j]:
+                continue
+
+            window_indices = indices[i - window_size:i + window_size + 1, j - window_size:j + window_size + 1].flatten()  # row-major; 1D length-(neighbourhood_size) int array
+            window_indices_displaced = index_displacement_map[window_indices]  # 1D length-(neighbourhood_size) int array
+
+            # Variables prefixed with R_ mirror robust_matting.cpp
+            R_A9x3 = I[i - window_size:i + window_size + 1, j - window_size:j + window_size + 1, :].reshape((neighbourhood_size, C))  # row-major; neighbourhood_size x C float array
+            R_win_mu = np.mean(R_A9x3, axis=0).reshape(1, -1)  # sum columns; 1 x C float array
+            R_M9x3 = np.tile(R_win_mu, (neighbourhood_size, 1))  # neighbourhood_size x C float array
+            R_inv_win_var = splinalg.inv((R_A9x3.T @ R_A9x3) / neighbourhood_size - R_win_mu.T @ R_win_mu + epsilon / neighbourhood_size * np.eye(C))  # C x C float array
+            R_T9x9 = (1 + ((R_A9x3 - R_M9x3) @ R_inv_win_var @ (R_A9x3 - R_M9x3).T)) / neighbourhood_size  # neighbourhood_size x neighbourhood_size matrix
+
+            # iterate over lower rectangle of R_T9x9 (excluding main diagonal) due to its symmetry
+            # we skip main diagonal entries because they get annihilated
+            for ii in range(1, neighbourhood_size):
+                for jj in range(0, ii):
+                    displaced_ii = window_indices_displaced[ii]
+                    displaced_jj = window_indices_displaced[jj]
+                    if displaced_ii < known_count and displaced_jj < known_count:
+                        # Pixels window_indices[ii] and window_indices[jj] are both known
+                        # These entries contribute to Lk only, which we won't need
+                        continue
+                    elif displaced_ii >= known_count and displaced_jj >= known_count:
+                        # Pixels window_indices[ii] and window_indices[jj] are both unknown
+                        # These entries contribute to Lu only
+                        R_v = R_T9x9[ii, jj]
+                        displaced_ii = displaced_ii - known_count
+                        displaced_jj = displaced_jj - known_count
+
+                        Lu_constructor_row_indices += [displaced_ii, displaced_ii, displaced_jj, displaced_jj]
+                        Lu_constructor_col_indices += [displaced_jj, displaced_ii, displaced_ii, displaced_jj]
+                        Lu_constructor_vals += [-R_v, R_v, -R_v, R_v]
+
+                        # Lu[displaced_ii, displaced_jj] -= R_v
+                        # Lu[displaced_ii, displaced_ii] += R_v  # diagonal entry is the sum of off-diagonal entries in same row
+
+                        # Lu[displaced_jj, displaced_ii] -= R_v  # by symmetry of Lu
+                        # Lu[displaced_jj, displaced_jj] += R_v  # diagonal entry is the sum of off-diagonal entries in same row
+                    elif displaced_ii >= known_count and displaced_jj < known_count:
+                        # Pixel window_indices[ii] is unknown; pixel window_indices[jj] is known
+                        # These entries contribute to both RT0 and Lu
+                        R_v = R_T9x9[ii, jj]
+                        displaced_ii = displaced_ii - known_count
+
+                        RT0_constructor_row_indices.append(displaced_ii)
+                        RT0_constructor_col_indices.append(displaced_jj)
+                        RT0_constructor_vals.append(-R_v)
+                        Lu_constructor_row_indices.append(displaced_ii)
+                        Lu_constructor_col_indices.append(displaced_ii)
+                        Lu_constructor_vals.append(R_v)
+
+                        # RT0[displaced_ii, displaced_jj] -= R_v
+                        # Lu[displaced_ii, displaced_ii] += R_v  # diagonal entry is the sum of off-diagonal entries in same row
+                    else:
+                        # displaced_ii < known_count and displaced_jj >= known_count:
+                        # Pixel window_indices[ii] is known; pixel window_indices[jj] is unknown
+                        # These entries contribute to both RT0 and Lu
+                        R_v = R_T9x9[ii, jj]
+                        displaced_jj = displaced_jj - known_count
+
+                        RT0_constructor_row_indices.append(displaced_jj)
+                        RT0_constructor_col_indices.append(displaced_ii)
+                        RT0_constructor_vals.append(-R_v)
+                        Lu_constructor_row_indices.append(displaced_jj)
+                        Lu_constructor_col_indices.append(displaced_jj)
+                        Lu_constructor_vals.append(R_v)
+
+                        # RT0[displaced_jj, displaced_ii] -= R_v
+                        # Lu[displaced_jj, displaced_jj] += R_v  # diagonal entry is the sum of off-diagonal entries in same row
+
+    Lu = spsparse.csr_array((Lu_constructor_vals, (Lu_constructor_row_indices, Lu_constructor_col_indices)), shape=(unknown_count, unknown_count))
+    RT0 = spsparse.csr_array((RT0_constructor_vals, (RT0_constructor_row_indices, RT0_constructor_col_indices)), shape=(unknown_count, known_count))
+
+    return Lu, RT0
+
+
 
 
 
@@ -240,9 +359,9 @@ def solve_alpha(
     logging.debug(f"np.min(estimated_result) = {np.max(estimated_result)}")
     estimated_result = np.clip(estimated_result, -0.05, 1.05)  # TODO: Evaluate effectiveness of treating nonsensical alphas at this stage
     logging.debug(f"Clipping estimated_result to [-0.05, 1.05] range")
-    logging.info("Showing estimated result (estimated alphas)")
-    skimage.io.imshow(np.clip(estimated_result, 0, 1))
-    skimage.io.show()
+    # logging.info("Showing estimated result (estimated alphas)")
+    # skimage.io.imshow(np.clip(estimated_result, 0, 1))
+    # skimage.io.show()
 
     indices = np.arange(H * W).reshape((H, W))  # row-major
     unknown_indices_rowmaj = indices[unknown_map]  # row-major traversal of unknown pixels;  1D length-(unknown_count) int array
@@ -255,10 +374,15 @@ def solve_alpha(
     WiF = -gamma * (estimated_confidences * estimated_alphas + (1 - estimated_confidences) * (estimated_alphas > 0.5).astype(int))  # row-major traversal of unknown pixels;  1D length-(unknown_count) float array
     WiB = -gamma * (estimated_confidences * (1 - estimated_alphas) + (1 - estimated_confidences) * (estimated_alphas <= 0.5).astype(int))  # row-major traversal of unknown pixels;  1D length-(unknown_count) float array
     L = get_laplacian(I, ~unknown_map, epsilon, window_size, index_displacement_map).tolil()  # H x W sparse-LIL float matrix. LIL format required for fancy indexing and still retaining sparse format
-
     RT_fragment = L[known_count:, :known_count]  # a little slow
-    RT = spsparse.hstack((WiF.reshape(-1, 1), WiB.reshape(-1, 1), RT_fragment), format="csr")
     Lu = L[known_count:, known_count:].reshape(unknown_count, unknown_count).tocsr()
+
+    # Variables prefixed with R_ mirror robust_matting.cpp
+    R_Lu, R_RT0 = referenceimpl_get_Lu_RT(I, ~unknown_map, epsilon, window_size, index_displacement_map)  # using CPP-like code which doesn't construct entire L. May be useful if memory becomes a constraint, though this runs slightly more slowly. Results are identical.
+    print(F"sparse_allclose(RT_fragment, R_RT0) = {utils.sparse_allclose(RT_fragment, R_RT0, 'RT_fragment', 'R_RT0')}")
+    print(F"sparse_allclose(Lu, R_Lu) = {utils.sparse_allclose(Lu, R_Lu, 'Lu', 'R_Lu')}")
+
+    RT = spsparse.hstack((WiF.reshape(-1, 1), WiB.reshape(-1, 1), RT_fragment), format="csr")
     Lu.setdiag(Lu.diagonal() + gamma)
     result = foreground_map.astype(float)  # H x W float array
     Ak = np.concatenate(([1, 0], result[~unknown_map]))
