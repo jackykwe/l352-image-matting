@@ -8,7 +8,7 @@ import scipy.sparse as spsparse
 import scipy.sparse.linalg as spsparselinalg
 from tqdm.auto import tqdm
 
-from . import sampling, utils
+from . import sampling
 from .utils import DIVISION_EPSILON
 
 # from . import slowmetrics  # for debugging only
@@ -74,128 +74,125 @@ def get_laplacian(I, constrained_map, epsilon, window_size, index_displacement_m
     D = spsparse.diags(W_mat_row_sum, 0, shape=(H * W, H * W), format="csr")
     # W_mat.setdiag(0)  # Zero diagonals? NO: do NOT set to zero; that's mathematically wrong. The MATLAB code of closed form is correct, and is also used here in Robust. The delta_{ij} terms exist.
     result = D - W_mat
-    # Technically this function can be further optimised by choosing to return RT_fragment and Lu directly, so we completely ignore constructing the Lk and R parts. That is done in the CPP code at https://github.com/wangchuan/RobustMatting/blob/f0d6144a800128a489e66cd2b5c5fb669c7a133c/src/robust_matting/robust_matting.cpp#L113. This is an avenue for further optimisation.
+    # Technically this function can be further optimised by choosing to return RT_fragment and Lu directly, so we completely ignore constructing the Lk and R parts. That is done in the CPP code at https://github.com/wangchuan/RobustMatting/blob/f0d6144a800128a489e66cd2b5c5fb669c7a133c/src/robust_matting/robust_matting.cpp#L113. Call referenceimpl_get_Lu_RT() to do this; but it turns out that it runs slightly more slowly than just constructing the entire matrix blindly, due to all the if-else checks...
     return result
 
 
+# def referenceimpl_get_Lu_RT(I, constrained_map, epsilon, window_size, index_displacement_map):
+#     """
+#     `I`: H x W x C array
+#     `constrained_map`: H x W bool array
 
+#     Returns:
+#     ```
+#     (
+#         unknown_count x unknown_count sparse float array  # this is Lu
+#         unknown_count x known_count sparse float array  # this is RT0
+#     )
+#     ```
+#     """
+#     unknown_count = np.count_nonzero(~constrained_map)
+#     known_count = np.count_nonzero(constrained_map)
 
+#     # Lu = spsparse.lil_array((unknown_count, unknown_count), dtype=float)  # unknown_count x unknown_count float sparse array
+#     # RT0 = spsparse.lil_array((unknown_count, known_count), dtype=float)  # unknown_count x known_count float sparse array
+#     # # RT1: unknown_count x 2 float sparse array
 
-def referenceimpl_get_Lu_RT(I, constrained_map, epsilon, window_size, index_displacement_map):
-    """
-    `I`: H x W x C array
-    `constrained_map`: H x W bool array
+#     neighbourhood_size = (1 + 2 * window_size) ** 2
+#     H, W, C = I.shape
+#     constrained_map = spndimage.binary_erosion(constrained_map, np.ones((1 + 2 * window_size, 1 + 2 * window_size))).astype(int)
 
-    Returns:
-    ```
-    (
-        unknown_count x unknown_count sparse float array  # this is Lu
-        unknown_count x known_count sparse float array  # this is RT0
-    )
-    ```
-    """
-    unknown_count = np.count_nonzero(~constrained_map)
-    known_count = np.count_nonzero(constrained_map)
+#     indices = np.arange(H * W).reshape((H, W))  # row-major
 
-    # Lu = spsparse.lil_array((unknown_count, unknown_count), dtype=float)  # unknown_count x unknown_count float sparse array
-    # RT0 = spsparse.lil_array((unknown_count, known_count), dtype=float)  # unknown_count x known_count float sparse array
-    # # RT1: unknown_count x 2 float sparse array
+#     Lu_constructor_row_indices = []
+#     Lu_constructor_col_indices = []
+#     Lu_constructor_vals = []
+#     RT0_constructor_row_indices = []
+#     RT0_constructor_col_indices = []
+#     RT0_constructor_vals = []
 
-    neighbourhood_size = (1 + 2 * window_size) ** 2
-    H, W, C = I.shape
-    constrained_map = spndimage.binary_erosion(constrained_map, np.ones((1 + 2 * window_size, 1 + 2 * window_size))).astype(int)
+#     for i in tqdm(
+#         range(window_size, H - window_size),
+#         desc=f"Generating Lu and RT0",
+#         disable=not logging.root.isEnabledFor(logging.INFO)
+#     ):
+#         for j in range(window_size, W - window_size):
+#             # (i, j) represents a particular window centre k
+#             if constrained_map[i, j]:
+#                 continue
 
-    indices = np.arange(H * W).reshape((H, W))  # row-major
+#             window_indices = indices[i - window_size:i + window_size + 1, j - window_size:j + window_size + 1].flatten()  # row-major; 1D length-(neighbourhood_size) int array
+#             window_indices_displaced = index_displacement_map[window_indices]  # 1D length-(neighbourhood_size) int array
 
-    Lu_constructor_row_indices = []
-    Lu_constructor_col_indices = []
-    Lu_constructor_vals = []
-    RT0_constructor_row_indices = []
-    RT0_constructor_col_indices = []
-    RT0_constructor_vals = []
+#             # Variables prefixed with R_ mirror robust_matting.cpp
+#             R_A9x3 = I[i - window_size:i + window_size + 1, j - window_size:j + window_size + 1, :].reshape((neighbourhood_size, C))  # row-major; neighbourhood_size x C float array
+#             R_win_mu = np.mean(R_A9x3, axis=0).reshape(1, -1)  # sum columns; 1 x C float array
+#             R_M9x3 = np.tile(R_win_mu, (neighbourhood_size, 1))  # neighbourhood_size x C float array
+#             R_inv_win_var = splinalg.inv((R_A9x3.T @ R_A9x3) / neighbourhood_size - R_win_mu.T @ R_win_mu + epsilon / neighbourhood_size * np.eye(C))  # C x C float array
+#             R_T9x9 = (1 + ((R_A9x3 - R_M9x3) @ R_inv_win_var @ (R_A9x3 - R_M9x3).T)) / neighbourhood_size  # neighbourhood_size x neighbourhood_size matrix
 
-    for i in tqdm(
-        range(window_size, H - window_size),
-        desc=f"Generating Lu and RT0",
-        disable=not logging.root.isEnabledFor(logging.INFO)
-    ):
-        for j in range(window_size, W - window_size):
-            # (i, j) represents a particular window centre k
-            if constrained_map[i, j]:
-                continue
+#             # iterate over lower rectangle of R_T9x9 (excluding main diagonal) due to its symmetry
+#             # we skip main diagonal entries because they get annihilated
+#             for ii in range(1, neighbourhood_size):
+#                 for jj in range(0, ii):
+#                     displaced_ii = window_indices_displaced[ii]
+#                     displaced_jj = window_indices_displaced[jj]
+#                     if displaced_ii < known_count and displaced_jj < known_count:
+#                         # Pixels window_indices[ii] and window_indices[jj] are both known
+#                         # These entries contribute to Lk only, which we won't need
+#                         continue
+#                     elif displaced_ii >= known_count and displaced_jj >= known_count:
+#                         # Pixels window_indices[ii] and window_indices[jj] are both unknown
+#                         # These entries contribute to Lu only
+#                         R_v = R_T9x9[ii, jj]
+#                         displaced_ii = displaced_ii - known_count
+#                         displaced_jj = displaced_jj - known_count
 
-            window_indices = indices[i - window_size:i + window_size + 1, j - window_size:j + window_size + 1].flatten()  # row-major; 1D length-(neighbourhood_size) int array
-            window_indices_displaced = index_displacement_map[window_indices]  # 1D length-(neighbourhood_size) int array
+#                         Lu_constructor_row_indices += [displaced_ii, displaced_ii, displaced_jj, displaced_jj]
+#                         Lu_constructor_col_indices += [displaced_jj, displaced_ii, displaced_ii, displaced_jj]
+#                         Lu_constructor_vals += [-R_v, R_v, -R_v, R_v]
 
-            # Variables prefixed with R_ mirror robust_matting.cpp
-            R_A9x3 = I[i - window_size:i + window_size + 1, j - window_size:j + window_size + 1, :].reshape((neighbourhood_size, C))  # row-major; neighbourhood_size x C float array
-            R_win_mu = np.mean(R_A9x3, axis=0).reshape(1, -1)  # sum columns; 1 x C float array
-            R_M9x3 = np.tile(R_win_mu, (neighbourhood_size, 1))  # neighbourhood_size x C float array
-            R_inv_win_var = splinalg.inv((R_A9x3.T @ R_A9x3) / neighbourhood_size - R_win_mu.T @ R_win_mu + epsilon / neighbourhood_size * np.eye(C))  # C x C float array
-            R_T9x9 = (1 + ((R_A9x3 - R_M9x3) @ R_inv_win_var @ (R_A9x3 - R_M9x3).T)) / neighbourhood_size  # neighbourhood_size x neighbourhood_size matrix
+#                         # Lu[displaced_ii, displaced_jj] -= R_v
+#                         # Lu[displaced_ii, displaced_ii] += R_v  # diagonal entry is the sum of off-diagonal entries in same row
 
-            # iterate over lower rectangle of R_T9x9 (excluding main diagonal) due to its symmetry
-            # we skip main diagonal entries because they get annihilated
-            for ii in range(1, neighbourhood_size):
-                for jj in range(0, ii):
-                    displaced_ii = window_indices_displaced[ii]
-                    displaced_jj = window_indices_displaced[jj]
-                    if displaced_ii < known_count and displaced_jj < known_count:
-                        # Pixels window_indices[ii] and window_indices[jj] are both known
-                        # These entries contribute to Lk only, which we won't need
-                        continue
-                    elif displaced_ii >= known_count and displaced_jj >= known_count:
-                        # Pixels window_indices[ii] and window_indices[jj] are both unknown
-                        # These entries contribute to Lu only
-                        R_v = R_T9x9[ii, jj]
-                        displaced_ii = displaced_ii - known_count
-                        displaced_jj = displaced_jj - known_count
+#                         # Lu[displaced_jj, displaced_ii] -= R_v  # by symmetry of Lu
+#                         # Lu[displaced_jj, displaced_jj] += R_v  # diagonal entry is the sum of off-diagonal entries in same row
+#                     elif displaced_ii >= known_count and displaced_jj < known_count:
+#                         # Pixel window_indices[ii] is unknown; pixel window_indices[jj] is known
+#                         # These entries contribute to both RT0 and Lu
+#                         R_v = R_T9x9[ii, jj]
+#                         displaced_ii = displaced_ii - known_count
 
-                        Lu_constructor_row_indices += [displaced_ii, displaced_ii, displaced_jj, displaced_jj]
-                        Lu_constructor_col_indices += [displaced_jj, displaced_ii, displaced_ii, displaced_jj]
-                        Lu_constructor_vals += [-R_v, R_v, -R_v, R_v]
+#                         RT0_constructor_row_indices.append(displaced_ii)
+#                         RT0_constructor_col_indices.append(displaced_jj)
+#                         RT0_constructor_vals.append(-R_v)
+#                         Lu_constructor_row_indices.append(displaced_ii)
+#                         Lu_constructor_col_indices.append(displaced_ii)
+#                         Lu_constructor_vals.append(R_v)
 
-                        # Lu[displaced_ii, displaced_jj] -= R_v
-                        # Lu[displaced_ii, displaced_ii] += R_v  # diagonal entry is the sum of off-diagonal entries in same row
+#                         # RT0[displaced_ii, displaced_jj] -= R_v
+#                         # Lu[displaced_ii, displaced_ii] += R_v  # diagonal entry is the sum of off-diagonal entries in same row
+#                     else:
+#                         # displaced_ii < known_count and displaced_jj >= known_count:
+#                         # Pixel window_indices[ii] is known; pixel window_indices[jj] is unknown
+#                         # These entries contribute to both RT0 and Lu
+#                         R_v = R_T9x9[ii, jj]
+#                         displaced_jj = displaced_jj - known_count
 
-                        # Lu[displaced_jj, displaced_ii] -= R_v  # by symmetry of Lu
-                        # Lu[displaced_jj, displaced_jj] += R_v  # diagonal entry is the sum of off-diagonal entries in same row
-                    elif displaced_ii >= known_count and displaced_jj < known_count:
-                        # Pixel window_indices[ii] is unknown; pixel window_indices[jj] is known
-                        # These entries contribute to both RT0 and Lu
-                        R_v = R_T9x9[ii, jj]
-                        displaced_ii = displaced_ii - known_count
+#                         RT0_constructor_row_indices.append(displaced_jj)
+#                         RT0_constructor_col_indices.append(displaced_ii)
+#                         RT0_constructor_vals.append(-R_v)
+#                         Lu_constructor_row_indices.append(displaced_jj)
+#                         Lu_constructor_col_indices.append(displaced_jj)
+#                         Lu_constructor_vals.append(R_v)
 
-                        RT0_constructor_row_indices.append(displaced_ii)
-                        RT0_constructor_col_indices.append(displaced_jj)
-                        RT0_constructor_vals.append(-R_v)
-                        Lu_constructor_row_indices.append(displaced_ii)
-                        Lu_constructor_col_indices.append(displaced_ii)
-                        Lu_constructor_vals.append(R_v)
+#                         # RT0[displaced_jj, displaced_ii] -= R_v
+#                         # Lu[displaced_jj, displaced_jj] += R_v  # diagonal entry is the sum of off-diagonal entries in same row
 
-                        # RT0[displaced_ii, displaced_jj] -= R_v
-                        # Lu[displaced_ii, displaced_ii] += R_v  # diagonal entry is the sum of off-diagonal entries in same row
-                    else:
-                        # displaced_ii < known_count and displaced_jj >= known_count:
-                        # Pixel window_indices[ii] is known; pixel window_indices[jj] is unknown
-                        # These entries contribute to both RT0 and Lu
-                        R_v = R_T9x9[ii, jj]
-                        displaced_jj = displaced_jj - known_count
+#     Lu = spsparse.csr_array((Lu_constructor_vals, (Lu_constructor_row_indices, Lu_constructor_col_indices)), shape=(unknown_count, unknown_count))
+#     RT0 = spsparse.csr_array((RT0_constructor_vals, (RT0_constructor_row_indices, RT0_constructor_col_indices)), shape=(unknown_count, known_count))
 
-                        RT0_constructor_row_indices.append(displaced_jj)
-                        RT0_constructor_col_indices.append(displaced_ii)
-                        RT0_constructor_vals.append(-R_v)
-                        Lu_constructor_row_indices.append(displaced_jj)
-                        Lu_constructor_col_indices.append(displaced_jj)
-                        Lu_constructor_vals.append(R_v)
-
-                        # RT0[displaced_jj, displaced_ii] -= R_v
-                        # Lu[displaced_jj, displaced_jj] += R_v  # diagonal entry is the sum of off-diagonal entries in same row
-
-    Lu = spsparse.csr_array((Lu_constructor_vals, (Lu_constructor_row_indices, Lu_constructor_col_indices)), shape=(unknown_count, unknown_count))
-    RT0 = spsparse.csr_array((RT0_constructor_vals, (RT0_constructor_row_indices, RT0_constructor_col_indices)), shape=(unknown_count, known_count))
-
-    return Lu, RT0
+#     return Lu, RT0
 
 
 
@@ -377,10 +374,10 @@ def solve_alpha(
     RT_fragment = L[known_count:, :known_count]  # a little slow
     Lu = L[known_count:, known_count:].reshape(unknown_count, unknown_count).tocsr()
 
-    # Variables prefixed with R_ mirror robust_matting.cpp
-    R_Lu, R_RT0 = referenceimpl_get_Lu_RT(I, ~unknown_map, epsilon, window_size, index_displacement_map)  # using CPP-like code which doesn't construct entire L. May be useful if memory becomes a constraint, though this runs slightly more slowly. Results are identical.
-    print(F"sparse_allclose(RT_fragment, R_RT0) = {utils.sparse_allclose(RT_fragment, R_RT0, 'RT_fragment', 'R_RT0')}")
-    print(F"sparse_allclose(Lu, R_Lu) = {utils.sparse_allclose(Lu, R_Lu, 'Lu', 'R_Lu')}")
+    # # Variables prefixed with R_ mirror robust_matting.cpp
+    # R_Lu, R_RT0 = referenceimpl_get_Lu_RT(I, ~unknown_map, epsilon, window_size, index_displacement_map)  # using CPP-like code which doesn't construct entire L. May be useful if memory becomes a constraint, though this runs slightly more slowly. Results are identical.
+    # print(F"sparse_allclose(RT_fragment, R_RT0) = {utils.sparse_allclose(RT_fragment, R_RT0, 'RT_fragment', 'R_RT0')}")
+    # print(F"sparse_allclose(Lu, R_Lu) = {utils.sparse_allclose(Lu, R_Lu, 'Lu', 'R_Lu')}")
 
     RT = spsparse.hstack((WiF.reshape(-1, 1), WiB.reshape(-1, 1), RT_fragment), format="csr")
     Lu.setdiag(Lu.diagonal() + gamma)

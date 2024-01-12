@@ -28,9 +28,7 @@ def get_laplacian(I, constrained_map, epsilon, window_size, *, debug_levels_coun
     constrained_map = spndimage.binary_erosion(constrained_map.astype(bool), np.ones((1 + 2 * window_size, 1 + 2 * window_size))).astype(int)
 
     indices = np.arange(H * W).reshape((H, W))  # row-major
-    # temp_length is the number of window centres (excluding a strip of width window_size around image) that we need to sum
-    # i.e. those whose neighbourhoods contain at least one unconstrained pixel
-    constructor_length = np.sum(1 - constrained_map[window_size:-window_size, window_size:-window_size]) * neighbourhood_size_squared  # this is tlen in MATLAB code; this is the length of the arguments to sp.sparse.csr_matrix(). Here in Python we also exploit the feature of csr_matrix() that accumulates values of duplicated indices
+    constructor_length = np.sum(1 - constrained_map[window_size:-window_size, window_size:-window_size]) * neighbourhood_size_squared  # this is tlen in MATLAB code; this is the length of the arguments to sp.sparse.csr_matrix(). Here in Python we also exploit the feature of csr_matrix() that accumulates values of duplicated indices, Each window contributes neighbourhood_size_squared values to the sparse matrix.
 
     # These three are arguments to the sp.sparse.csr_matrix() sparse matrix constructor
     constructor_row_indices = np.zeros(constructor_length)
