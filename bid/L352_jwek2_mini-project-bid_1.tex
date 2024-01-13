@@ -1,0 +1,132 @@
+\documentclass{article}
+
+\newcommand{\coursename}{Advanced Graphics \& Image Processing}
+\newcommand{\partno}{Part III}
+\newcommand{\paperno}{}  % fill in exactly one
+\newcommand{\moduleno}{L352 Mini-Project Bid}  % fill in exactly one
+%\chead{\textlightgray{}}
+
+% Pull in the template, configured as above.
+\input{/home/jacky/Documents/part-ii/courses/Work/templates/shared_template.tex}
+\input{/home/jacky/Documents/part-ii/courses/Work/templates/notes_template.tex}
+
+\graphicspath{ {imgs/}{components/imgs/} }
+
+%\setcounter{section}{-1}
+
+\begin{document}
+\begin{center}
+    \textbf{Project Title: Image matting}
+\end{center}
+\setcounter{section}{-1}
+\section{Project Synopsis}
+\emph{Image matting is the problem of extracting the foreground from the image with a ``soft'' alpha-mask. Different from image segmentation which assigns a binary mask to the foreground and background, image matting targets to find the foreground opacity or alpha matte, which has fractional values between 0 to 1. Existing methods can be categorised into two classes, i.e. sampling-based methods \cite{bayesian-matting, robust-matting} and propagation-based methods \cite{poisson-matting, closed-form-matting}.}
+
+\emph{In this project, you will either re-implement or use existing code for the classical propagation-based closed-form matting \cite{closed-form-matting} and implement a sampling-based method \cite{robust-matting}. Then, you will compare the results between \cite{closed-form-matting} and \cite{robust-matting}, and write down your observation.}
+
+\section{Description of Project Area}
+%up to 250 words general description of the project area with 2-3 references to relevant papers (evidence of the background research);
+
+%Hi \cite{bayesian-matting}. \cite{eek}
+
+The matting equation is defined at each pixel $(x,y)$ of a known image $I$ by
+$$I_{x,y} = \alpha_{x,y} F_{x,y}  + (1-\alpha_{x,y}) B_{x,y}$$
+where $\alpha\in[0,1]$, and $F,B$ are the unknown ``foreground'' and ``background'' images. The image matting problem is to estimate $\alpha,F,B$ from $I$ and additional information from a user. This can take the form of \emph{trimaps}, in which the user \emph{annotates} pixel regions that are definitely foreground, definitely background, and ambiguous.
+
+The alpha mask is fractional to allow smooth handling of fine details such as hairs, and also for motion blurring \cite{bayesian-matting}. The traditional green/blue screen technique works, but we are interested in matting for general images.
+
+Classical methods are split into two classes.
+\begin{itemize}
+    \item \emph{Sampling-based} methods first estimate $F_{x,y}$ and $B_{x,y}$, then solve for $\alpha_{x,y}$, then refine $F_{x,y},B_{x,y}$ \cite{dim-paper}.
+
+    \textbf{Bayesian Matting} \cite{bayesian-matting} solves for the maximum a posteriori (MAP) estimate for $\alpha,F,B$ simultaneously. \textbf{Optimised Colour Sampling} \cite{robust-matting} computes a confidence measure for samples, and only considers those with high-confidence when sampling.
+    \item \emph{Propagation-based} methods ``propagate'' the known alphas from annotated regions into the ambiguous regions \cite{dim-paper}.
+
+    \textbf{Poisson Matting} \cite{poisson-matting} solves a Poisson equation with a desired alpha gradient field. \textbf{Closed-Form Matting} \cite{closed-form-matting} is the newest and most superior of these four techniques, and produces $\alpha$ as a solution of a system of sparse linear equations.
+\end{itemize}
+
+Recent work mostly arises from the deep learning community. Neural networks supersede classical algorithms for image matting as they are able to  represent and capture complicated high-level context (e.g.\ common patterns in hairs), which heavily influence the quality of the output matte \cite{sota-composition-1k}.
+
+\emph{(248 words)}
+
+%
+%[Deep survey] Performance benchmarking... losses.
+%[Rethinking Context aggregation] Why NNs are used; and currently one of the SOTA (for dataset from DIM paper). Deep learning-based methods [52, 31] use an encoder to extract context features from the input and then estimate the alpha matte through a decoder, as shown in Figure 1(a). Due to the powerful representation ability of the learned context features, these methods significantly outperform traditional sampling-based and propagation-based methods.
+
+%Closed form: code in objective-C is provided. Might want to re-implement in a more modern language? See if it already exists. Solves for alpha, then F and B.
+%Optimisation: alpha, then F and B
+%Estimate F,B then alpha, then F,B. Iterative.
+
+
+
+%[DIM] create a large-scale image matting dataset including 49300 training images and 1000 testing images.  [Composition-1K] Points out assumptions where classical methods fall (relying on colour and spatial position of pixels as the distinguishing feature, thus sensitive to FG/BG distributions overlapping (common for natural images))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+%\cite{bayesian-matting}
+%\cite{robust-matting}
+%\cite{closed-form-matting}
+%\cite{poisson-matting}
+
+
+
+\section{Approach to the Problem (Methods)}
+%up to 250 words description of their approach the problem (methods);
+
+The proposed plan of this project is to:
+\begin{enumerate}[label=\arabic*.]
+    \item Re-implement, adapting code wherever possible, \textbf{Closed-Form Matting} (propagation-based) and \textbf{Optimised Colour Sampling} (sampling-based). If time permits (pending discussion of final project scope with supervisor), the other two mentioned classical methods may be implemented too. The aim is to achieve deep understanding of these classical methods.
+    \item Compare the results between these two classes of methods:
+    \begin{itemize}
+        \item (Qualitative) The four papers provided in the synopsis \cite{bayesian-matting, robust-matting, poisson-matting, closed-form-matting} rely mainly on qualitative evaluation on a small number of ``problematic'' images. These would be sourced from more recent literature.
+        \item (Quantitative) Some of the four papers use metrics such as \emph{mean squared error} or \emph{mean absolute error} (MAE) between ground-truth and predicted mattes $\alpha$. MAE is also known as \emph{alpha loss} in deep learning literature \cite{dnn-survey}.
+
+        Deep learning methods use a much wider variety of metrics, including \emph{composition loss}, \emph{Laplacian loss} and \emph{cross entropy loss} \cite{dnn-survey}. An attempt would be made to evaluate the re-implemented classical methods using some of these metrics.
+    \end{itemize}
+    \item If the scope of the project will not become too big (pending discussion with supervisor), and if time and resources permit, use existing code for a state-of-the-art deep learning model, and compare its performance against the classical methods. An attempt would be made to corroborating the explanations of of Liu et al.\ \cite{sota-composition-1k} regarding the superiority of neural networks over classical methods.
+\end{enumerate}
+
+%SAMPLING
+%Bayesian: few test images
+%Optimised colour: MSE with 8 test images
+%
+%PROPAGATION
+%Poisson: few test images
+%Closed-form: discussion of few test images (known to be hard for the time). Quantitative numbers: summed absolute error [alpha loss] Application to classical methods?
+
+%Mostly qualitative. Quantitative metrics (also from Image and Video Quality Assessment lecture coming up)
+%
+%Deep learning: many kinds of losses.
+
+
+\emph{(227 words)}
+
+
+\section{Skills and Interests}
+%and up to 150 word statements why their poses the skills and/or interests to work on the problem.
+
+I have always wondered how background replacement in online conference calling works, and what the technical challenges of the problem are, since current methods seem imperfect and ``glitch'' at times. While performing literature review for this bid, though details were glossed over, I became extremely intrigued by the work done in this field, for both classical and deep approaches.
+
+I do not have extensive deep learning experience, nor do I intend to shoehorn deep learning into this project, but I looked up a bit on neural network approaches out of curiosity. Although deep learning approaches seem to dominate state-of-the-art rankings, I still think the classical methods have merits and definitely worth exploring, particularly if they can be executed at a lower time and space cost.
+
+Provided this project is not over-ambitious, I would be happy to investigate any research directions the supervisor has in mind for this project.
+
+\emph{(148 words)}
+
+\bibliographystyle{unsrt}
+\bibliography{refs}
+\end{document}

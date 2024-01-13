@@ -230,8 +230,8 @@ def get_samples(
     return (
         foreground_samples,
         background_samples,
-        foreground_boundary_is[foreground_choices],  # returned for debugging purposes
-        foreground_boundary_js[foreground_choices],  # returned for debugging purposes
-        background_boundary_is[background_choices],  # returned for debugging purposes
-        background_boundary_js[background_choices]  # returned for debugging purposes
+        None, # foreground_boundary_is[foreground_choices],  # returned for debugging purposes; set to None to avoid unnecessary slow comptuation (indexing)
+        None, # foreground_boundary_js[foreground_choices],  # returned for debugging purposes; set to None to avoid unnecessary slow comptuation (indexing)
+        None, # background_boundary_is[background_choices],  # returned for debugging purposes; set to None to avoid unnecessary slow comptuation (indexing)
+        None, # background_boundary_js[background_choices]  # returned for debugging purposes; set to None to avoid unnecessary slow comptuation (indexing)
     )

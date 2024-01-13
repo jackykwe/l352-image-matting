@@ -4,6 +4,9 @@ matting
 # Datasets
 datasets
 
+# Outputs
+src/output
+
 # MATLAB code by original author
 matlab
 
