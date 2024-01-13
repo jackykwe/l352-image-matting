@@ -36,15 +36,13 @@
 \usepackage{multicol}
 \title{Image matting}
 \author{Jacky~W.E.~Kung}
-\date{December 2023}
+\date{15 January 2024}
 
 \setlength{\columnsep}{0.5cm}
 \begin{document}
 \maketitle
 \begin{abstract}
-    GG
-
-    \textbf{NB. MAXIMUM FOUR PAGES}
+    Image matting is a well-understood problem, and there exists closed-form solutions. However, as the problem is fundamentally underdetermined, there is no single ``correct'' solution, and thus algorithms in literature have considerable flexibility in defining what a ``best'' solution is and how to obtain it. This work reimplements one sampling-based and one propagation-based classical matting algorithm, and discusses code optimisation strategies. A detailed mathematical treatment of the underlying concepts is consolidated and presented. Quantitative and qualitative comparisons with today's state of the art deep learning algorithm are presented.
 \end{abstract}
 \begin{multicols}{2}[]
 
@@ -53,7 +51,7 @@
 %In paper: less equations, more comparisons. Potentially change parameters (e.g. window size: graph: hyperparameter sweepish).
 
 \section{Introduction}
-\emph{The "Introduction" section should briefly describe the proposed technique/modification/application, but above all, it should motive the work. Why is this work worth doing and the paper worth reading?}
+% \emph{The "Introduction" section should briefly describe the proposed technique/modification/application, but above all, it should motive the work. Why is this work worth doing and the paper worth reading?}
 %https://people.csail.mit.edu/fredo/FredoGoodWriting.pdf
 %• Motivation
     %- need or opportunity
@@ -66,38 +64,11 @@
 %• Forget what you thought an overview was
 %- I hate “In section we introduce blah, in section 2....)
 
-The matting equation is defined at each pixel $(x,y)$ of a known image $I$ by
-$$I_{x,y} = \alpha_{x,y} F_{x,y}  + (1-\alpha_{x,y}) B_{x,y}$$
-where $\alpha\in[0,1]$, and $F,B$ are the unknown ``foreground'' and ``background'' images. The image matting problem is to estimate $\alpha,F,B$ from $I$ and additional information from a user. This can take the form of \emph{trimaps}, in which the user \emph{annotates} pixel regions that are definitely foreground, definitely background, and ambiguous.
+The process of matting an image involves separating foreground objects from the background. Formally, the matting equation is defined at each pixel coordinate $(x,y)$ of the image $\mt I$ by $$I_{x,y} = \alpha_{x,y} F_{x,y}  + (1-\alpha_{x,y}) B_{x,y}$$
+where $\alpha_{x,y}\in[0,1]$, and $\mt F, \mt B$ are the unknown ``foreground'' and ``background'' images. The image matting problem is then to estimate $\alpha,F,B$ using $I$ and additional information from a user. This can take the form of \emph{trimaps}, in which the user annotates pixel regions that are definitely foreground, definitely background, and ambiguous. The alpha mask is fractional to allow smooth handling of fine details such as hairs, and also for motion blurring \cite{bayesian-matting}. The traditional green/blue screen technique works, but we are interested in matting for general images that do not have a monochrome background.
 
-The alpha mask is fractional to allow smooth handling of fine details such as hairs, and also for motion blurring \cite{bayesian-matting}. The traditional green/blue screen technique works, but we are interested in matting for general images.
+To the best of my knowledge, only a \verb|C++| implementation \cite{web:robust-cpp-github} exists for Robust Matting \cite{robust-matting}, and it cannot be compiled in 2024 due to outdated dependencies.  This work reimplements both Robust Matting and Closed-form Matting \cite{closed-form-matting} in Python. While there exists a Python implementation for the latter \cite{web:closed-form-python-github}, reimplementation without referring to it was done to obtain a deeper understanding of its mathematical foundations, which are also necessary for understanding Robust Matting. Furthermore, this work presents an evaluation of various sampling strategies for Robust Matting, which was left out in the original paper. Finally, a brief performance comparison with today's state of the art deep neural network (DNN) algorithm is performed.
 
-Classical methods are split into two classes.
-\begin{itemize}
-    \item \emph{Sampling-based} methods first estimate $F_{x,y}$ and $B_{x,y}$, then solve for $\alpha_{x,y}$, then refine $F_{x,y},B_{x,y}$ \cite{dim-paper}.
-
-    \textbf{Bayesian Matting} \cite{bayesian-matting} solves for the maximum a posteriori (MAP) estimate for $\alpha,F,B$ simultaneously. \textbf{Optimised Colour Sampling} \cite{robust-matting} computes a confidence measure for samples, and only considers those with high-confidence when sampling.
-    \item \emph{Propagation-based} methods ``propagate'' the known alphas from annotated regions into the ambiguous regions \cite{dim-paper}.
-
-    \textbf{Poisson Matting} \cite{poisson-matting} solves a Poisson equation with a desired alpha gradient field. \textbf{Closed-Form Matting} \cite{closed-form-matting} is the newest and most superior of these four techniques, and produces $\alpha$ as a solution of a system of sparse linear equations.
-\end{itemize}
-
-Recent work mostly arises from the deep learning community. Neural networks supersede classical algorithms for image matting as they are able to  represent and capture complicated high-level context (e.g.\ common patterns in hairs), which heavily influence the quality of the output matte \cite{sota-composition-1k}.
-
-
-
-The proposed plan of this project is to:
-\begin{enumerate}[label=\arabic*.]
-    \item Re-implement, adapting code wherever possible, \textbf{Closed-Form Matting} (propagation-based) and \textbf{Optimised Colour Sampling} (sampling-based). If time permits (pending discussion of final project scope with supervisor), the other two mentioned classical methods may be implemented too. The aim is to achieve deep understanding of these classical methods.
-    \item Compare the results between these two classes of methods:
-    \begin{itemize}
-        \item (Qualitative) The four papers provided in the synopsis \cite{bayesian-matting, robust-matting, poisson-matting, closed-form-matting} rely mainly on qualitative evaluation on a small number of ``problematic'' images. These would be sourced from more recent literature.
-        \item (Quantitative) Some of the four papers use metrics such as \emph{mean squared error} or \emph{mean absolute error} (MAE) between ground-truth and predicted mattes $\alpha$. MAE is also known as \emph{alpha loss} in deep learning literature \cite{dnn-survey}.
-
-        Deep learning methods use a much wider variety of metrics, including \emph{composition loss}, \emph{Laplacian loss} and \emph{cross entropy loss} \cite{dnn-survey}. An attempt would be made to evaluate the re-implemented classical methods using some of these metrics.
-    \end{itemize}
-    \item If the scope of the project will not become too big (pending discussion with supervisor), and if time and resources permit, use existing code for a state-of-the-art deep learning model, and compare its performance against the classical methods. An attempt would be made to corroborating the explanations of of Liu et al.\ \cite{sota-composition-1k} regarding the superiority of neural networks over classical methods.
-\end{enumerate}
 
 
 
@@ -109,7 +80,30 @@ The proposed plan of this project is to:
 
 
 \section{Related Work}
-\emph{The "Related work" section should review 2-4 relevant papers, compare and contrast the proposed work to what has been published before.}
+% \emph{The "Related work" section should review 2-4 relevant papers, compare and contrast the proposed work to what has been published before.}
+
+Classical matting algorithms are split into two classes. \emph{Sampling-based} methods first estimate $F_{x,y}$ and $B_{x,y}$ by sampling known foreground and background pixels marked by a provided trimap, then solve for $\alpha_{x,y}$ \cite{dim-paper}. Bayesian Matting solves for the maximum a posteriori (MAP) estimate for $\mts \alpha,\mt F,\mt B$ simultaneously \cite{bayesian-matting}. Robust Matting computes a confidence measure for foreground-background sample pairs, and chooses those with the highest confidence as the samples. This work focuses on Robust Matting as it is newer and better performant than Bayesian Matting. \emph{Propagation-based} methods transfer information about known alphas from annotated foreground and background regions into the unknown ambiguous regions \cite{dim-paper}. Poisson Matting solves a Poisson equation using a desired alpha gradient field \cite{poisson-matting}. Closed-form Matting produces $\mts \alpha$ by solving of a system of sparse linear equations, and is a seminal piece of work influencing many later algorithms. Again, this work focuses on Closed-form matting as it is newer and better than Poisson matting. Newer matting algorithms exist for both classes \cite{closed-form-survey}, but are outside the scope of this work.  %\cite{closed-form-matting} is the newest and most superior of these four techniques, and
+
+State of the art approaches today involve DNNs. The best performing algorithm on the \emph{Composition-1K} dataset at time of writing is \emph{AEMatter}, according to \emph{PapersWithCode}. As its authors explain, DNNs supersede classical algorithms with their ability to capture and represent complicated high-level context (e.g.\ common patterns in hairs), significantly improving the quality of mattes produced \cite{sota-composition-1k}. We compare the chosen classical algorithms with AEMatter in the evaluation section (\S\ref{evaluation}).
+
+% The proposed plan of this project is to:
+% \begin{enumerate}[label=\arabic*.]
+%     \item Re-implement, adapting code wherever possible, \textbf{Closed-Form Matting} (propagation-based) and \textbf{Optimised Colour Sampling} (sampling-based). If time permits (pending discussion of final project scope with supervisor), the other two mentioned classical methods may be implemented too. The aim is to achieve deep understanding of these classical methods.
+%     \item Compare the results between these two classes of methods:
+%     \begin{itemize}
+%         \item (Qualitative) The four papers provided in the synopsis \cite{bayesian-matting, robust-matting, poisson-matting, closed-form-matting} rely mainly on qualitative evaluation on a small number of ``problematic'' images. These would be sourced from more recent literature.
+%         \item (Quantitative) Some of the four papers use metrics such as \emph{mean squared error} or \emph{mean absolute error} (MAE) between ground-truth and predicted mattes $\alpha$. MAE is also known as \emph{alpha loss} in deep learning literature \cite{dnn-survey}.
+
+%         Deep learning methods use a much wider variety of metrics, including \emph{composition loss}, \emph{Laplacian loss} and \emph{cross entropy loss} \cite{dnn-survey}. An attempt would be made to evaluate the re-implemented classical methods using some of these metrics.
+%     \end{itemize}
+%     \item If the scope of the project will not become too big (pending discussion with supervisor), and if time and resources permit, use existing code for a state-of-the-art deep learning model, and compare its performance against the classical methods. An attempt would be made to corroborating the explanations of of Liu et al.\ \cite{sota-composition-1k} regarding the superiority of neural networks over classical methods.
+% \end{enumerate}
+
+
+
+
+
+
 %https://people.csail.mit.edu/fredo/FredoGoodWriting.pdf
 %• Focus on how they inform, motivate and differ from your work
 %• Can provide a self-contained introduction to the field
@@ -131,37 +125,52 @@ The proposed plan of this project is to:
 
 %[DIM] create a large-scale image matting dataset including 49300 training images and 1000 testing images.  [Composition-1K] Points out assumptions where classical methods fall (relying on colour and spatial position of pixels as the distinguishing feature, thus sensitive to FG/BG distributions overlapping (common for natural images))
 
+% \textbf{Do classical method research stop at Optimised Colour Sampling? Can my related work be limited to these 4/2/(2+1ML) papers?}
 
 
+% \begin{itemize}
+%     \item Bayesian 2001: a primitive sampling method, but non-interactive. Uses trimap.
+%     \item Poisson 2004: an improved propagation method, interactive (seminal propagation method paper?). Uses trimap. Fits oriented Gaussians to foreground and background images to learn then, then picks best aFB given the learned distribution.
+%     %“First, when the foreground and background colors are very similar, the matting equation becomes ill-conditioned. In this case, the underlying structure of the matte can not be easily distinguished from noise, background or foreground.” ([Sun et al., 2004, p. 320](zotero://select/library/items/QZ8DCSDY)) ([pdf](zotero://open-pdf/library/items/PB4T6VTX?page=6))
+%     %“where a mixture of oriented Gaussians is used to learn the local distribution and then , F , and B are estimated as the most probable ones given that distribution. Such methods work well when the color distributions of the foreground and the background do not overlap, and the unknown region in the trimap is small.” ([Levin et al., 2008, p. 229](zotero://select/library/items/TDAQSBJL)) ([pdf](zotero://open-pdf/library/items/ISLA8TYD?page=2))
+% \end{itemize}
+% \begin{itemize}
+%     \item Closed-Form Matting 2006: a propagation method. Doesn't \emph{necessarily} use trimaps. Argues trimaps are a limitation, and user interaction to refine trimap shouldn't be needed. Uses just a SPARSE set of scribbles from user since reliable estimates for F and B images are not required for this method. \textbf{CODE AVAILABLE. But it's in Objective-C...}
 
-\textbf{Do classical method research stop at Optimised Colour Sampling? Can my related work be limited to these 4/2/(2+1ML) papers?}
-
-
-\begin{itemize}
-    \item Bayesian 2001: a primitive sampling method, but non-interactive. Uses trimap.
-    \item Poisson 2004: an improved propagation method, interactive (seminal propagation method paper?). Uses trimap. Fits oriented Gaussians to foreground and background images to learn then, then picks best aFB given the learned distribution.
-    %“First, when the foreground and background colors are very similar, the matting equation becomes ill-conditioned. In this case, the underlying structure of the matte can not be easily distinguished from noise, background or foreground.” ([Sun et al., 2004, p. 320](zotero://select/library/items/QZ8DCSDY)) ([pdf](zotero://open-pdf/library/items/PB4T6VTX?page=6))
-    %“where a mixture of oriented Gaussians is used to learn the local distribution and then , F , and B are estimated as the most probable ones given that distribution. Such methods work well when the color distributions of the foreground and the background do not overlap, and the unknown region in the trimap is small.” ([Levin et al., 2008, p. 229](zotero://select/library/items/TDAQSBJL)) ([pdf](zotero://open-pdf/library/items/ISLA8TYD?page=2))
-\end{itemize}
-\begin{itemize}
-    \item Closed-Form Matting 2006: a propagation method. Doesn't \emph{necessarily} use trimaps. Argues trimaps are a limitation, and user interaction to refine trimap shouldn't be needed. Uses just a SPARSE set of scribbles from user since reliable estimates for F and B images are not required for this method. \textbf{CODE AVAILABLE. But it's in Objective-C...}
-
-    Can be seen as a smoothness refinement technique: \emph{``Smoothness refinement method is a straightforward idea that first utilizes sampling-based strategy to estimate the alpha matte and then refines the alpha matte using affinity-based strategy.''}
-    %“This is typically done by iterative nonlinear optimization, alternating the estimation of F and B with that of alpha. In practice, this means that for good results, the unknown regions in the trimap must be as small as possible. As a consequence, trimap-based approaches typically experience difficulty handling images with a significant portion of mixed pixels or when the foreground object has many holes [19].” ([Levin et al., 2008, p. 228](zotero://select/library/items/TDAQSBJL)) ([pdf](zotero://open-pdf/library/items/ISLA8TYD?page=1))
-    \item Optimised Colour Sampling (i.e.\ Robust Matting) 2007: the latest (of the four) sampling method.  Addresses lack of systematic comparison. Builds upon closed-form matting.
-\end{itemize}
+%     Can be seen as a smoothness refinement technique: \emph{``Smoothness refinement method is a straightforward idea that first utilizes sampling-based strategy to estimate the alpha matte and then refines the alpha matte using affinity-based strategy.''}
+%     %“This is typically done by iterative nonlinear optimization, alternating the estimation of F and B with that of alpha. In practice, this means that for good results, the unknown regions in the trimap must be as small as possible. As a consequence, trimap-based approaches typically experience difficulty handling images with a significant portion of mixed pixels or when the foreground object has many holes [19].” ([Levin et al., 2008, p. 228](zotero://select/library/items/TDAQSBJL)) ([pdf](zotero://open-pdf/library/items/ISLA8TYD?page=1))
+%     \item Optimised Colour Sampling (i.e.\ Robust Matting) 2007: the latest (of the four) sampling method.  Addresses lack of systematic comparison. Builds upon closed-form matting.
+% \end{itemize}
 
 
 %The methods may have different kinds of biases (different types of images). Sharp edges, noise, etc. METRICS.
 
 
 \section{Method}
-\emph{The "Method" section should clearly explain the technique, focusing on why certain decisions were taken, rather than just reporting the work that has been done. It should explain the method with the help of equations and illustrations, as appropriate.}
+% \emph{The "Method" section should clearly explain the technique, focusing on why certain decisions were taken, rather than just reporting the work that has been done. It should explain the method with the help of equations and illustrations, as appropriate.}
 %https://people.csail.mit.edu/fredo/FredoGoodWriting.pdf
 
 %For initial iteration, crop a small part of the image. Only for final testing use full images!!
 
-\section{Evaluation}
+Before implementing the two algorithms, I sought a deep understanding of their mathematical foundations. I will present some of the useful insights here, along with how they affect the code implementation.
+
+\subsection{Closed-form Matting}
+
+
+
+\subsection{Robust Matting}
+
+
+
+\subsection{AEMatter}
+
+
+
+
+
+
+
+\section{Evaluation}\label{evaluation}
 \emph{The "Evaluation" section should compare the method to the state-of-the-art, provide an evidence for improvement (or lack of it). The reported results should also show the limitations of the technique.}
 %https://people.csail.mit.edu/fredo/FredoGoodWriting.pdf
 %• Your results should support your claims
@@ -331,7 +340,7 @@ The (perhaps usual) notational standard of denoting scalars as unbolded, vectors
 \end{itemize}
 
 \section{Proof of Theorem 1}
-To the best of my knowledge, there is no full proof of Theorem 1 available on the public domain. The original paper \cite{closed-form-matting} and Li et al.\ \cite{closed-form-survey} present partial proofs for the greyscale case, but the coloured image case is omitted. I present the full proof of the coloured image case.
+To the best of my knowledge, there is no full proof of Theorem 1 available on the public domain. The original paper \cite{closed-form-matting} and Li et al.\ \cite{closed-form-survey} present partial proofs for the greyscale case, but the coloured image case is omitted. I present the full proof of the coloured image case; the full proof for the greyscale image case is conceptually identical and can be derived as a simplification.
 % This appendix presents the proof for the greyscale and colour version of Theorem 1. The proofs are structurally identical. The colour version just involves more matrix definitions and gymnastics.
 
 We consider images of height $H$ and width $W$, and index pixels from $\{0,\dots,HW-1\}$. We enforce the colour line model \cite[Theorem 2]{closed-form-matting} in local $M\times M$ square neighbourhoods of pixels, where $M$ is an odd integer hyperparameter typically set to $M=3$. For simplicity (also done in the author's code implementation), neighbourhood centres $k$ only come from the inner $\left(H-2\cdot \frac{M-1}{2}\right)\times \left(W-2\cdot \frac{M-1}{2}\right)$ image to avoid neighbourhoods including out-of-bound pixels. Let $K\subset \{0,\dots,HW-1\}$ be the set of valid neighbourhood centres. Then, for a given neighbourhood centre $k\in K$, the neighbourhood $w_{(k)}$ is defined as
