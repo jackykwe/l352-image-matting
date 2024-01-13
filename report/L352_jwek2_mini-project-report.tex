@@ -66,6 +66,38 @@
 %• Forget what you thought an overview was
 %- I hate “In section we introduce blah, in section 2....)
 
+The matting equation is defined at each pixel $(x,y)$ of a known image $I$ by
+$$I_{x,y} = \alpha_{x,y} F_{x,y}  + (1-\alpha_{x,y}) B_{x,y}$$
+where $\alpha\in[0,1]$, and $F,B$ are the unknown ``foreground'' and ``background'' images. The image matting problem is to estimate $\alpha,F,B$ from $I$ and additional information from a user. This can take the form of \emph{trimaps}, in which the user \emph{annotates} pixel regions that are definitely foreground, definitely background, and ambiguous.
+
+The alpha mask is fractional to allow smooth handling of fine details such as hairs, and also for motion blurring \cite{bayesian-matting}. The traditional green/blue screen technique works, but we are interested in matting for general images.
+
+Classical methods are split into two classes.
+\begin{itemize}
+    \item \emph{Sampling-based} methods first estimate $F_{x,y}$ and $B_{x,y}$, then solve for $\alpha_{x,y}$, then refine $F_{x,y},B_{x,y}$ \cite{dim-paper}.
+
+    \textbf{Bayesian Matting} \cite{bayesian-matting} solves for the maximum a posteriori (MAP) estimate for $\alpha,F,B$ simultaneously. \textbf{Optimised Colour Sampling} \cite{robust-matting} computes a confidence measure for samples, and only considers those with high-confidence when sampling.
+    \item \emph{Propagation-based} methods ``propagate'' the known alphas from annotated regions into the ambiguous regions \cite{dim-paper}.
+
+    \textbf{Poisson Matting} \cite{poisson-matting} solves a Poisson equation with a desired alpha gradient field. \textbf{Closed-Form Matting} \cite{closed-form-matting} is the newest and most superior of these four techniques, and produces $\alpha$ as a solution of a system of sparse linear equations.
+\end{itemize}
+
+Recent work mostly arises from the deep learning community. Neural networks supersede classical algorithms for image matting as they are able to  represent and capture complicated high-level context (e.g.\ common patterns in hairs), which heavily influence the quality of the output matte \cite{sota-composition-1k}.
+
+
+
+The proposed plan of this project is to:
+\begin{enumerate}[label=\arabic*.]
+    \item Re-implement, adapting code wherever possible, \textbf{Closed-Form Matting} (propagation-based) and \textbf{Optimised Colour Sampling} (sampling-based). If time permits (pending discussion of final project scope with supervisor), the other two mentioned classical methods may be implemented too. The aim is to achieve deep understanding of these classical methods.
+    \item Compare the results between these two classes of methods:
+    \begin{itemize}
+        \item (Qualitative) The four papers provided in the synopsis \cite{bayesian-matting, robust-matting, poisson-matting, closed-form-matting} rely mainly on qualitative evaluation on a small number of ``problematic'' images. These would be sourced from more recent literature.
+        \item (Quantitative) Some of the four papers use metrics such as \emph{mean squared error} or \emph{mean absolute error} (MAE) between ground-truth and predicted mattes $\alpha$. MAE is also known as \emph{alpha loss} in deep learning literature \cite{dnn-survey}.
+
+        Deep learning methods use a much wider variety of metrics, including \emph{composition loss}, \emph{Laplacian loss} and \emph{cross entropy loss} \cite{dnn-survey}. An attempt would be made to evaluate the re-implemented classical methods using some of these metrics.
+    \end{itemize}
+    \item If the scope of the project will not become too big (pending discussion with supervisor), and if time and resources permit, use existing code for a state-of-the-art deep learning model, and compare its performance against the classical methods. An attempt would be made to corroborating the explanations of of Liu et al.\ \cite{sota-composition-1k} regarding the superiority of neural networks over classical methods.
+\end{enumerate}
 
 
 
@@ -83,6 +115,23 @@
 %• Can provide a self-contained introduction to the field
 %• Sometime also add a tutorial on required background that is uncommon in the field
 %• Be generous. Don’t piss off people.
+
+
+
+
+%
+%[Deep survey] Performance benchmarking... losses.
+%[Rethinking Context aggregation] Why NNs are used; and currently one of the SOTA (for dataset from DIM paper). Deep learning-based methods [52, 31] use an encoder to extract context features from the input and then estimate the alpha matte through a decoder, as shown in Figure 1(a). Due to the powerful representation ability of the learned context features, these methods significantly outperform traditional sampling-based and propagation-based methods.
+
+%Closed form: code in objective-C is provided. Might want to re-implement in a more modern language? See if it already exists. Solves for alpha, then F and B.
+%Optimisation: alpha, then F and B
+%Estimate F,B then alpha, then F,B. Iterative.
+
+
+
+%[DIM] create a large-scale image matting dataset including 49300 training images and 1000 testing images.  [Composition-1K] Points out assumptions where classical methods fall (relying on colour and spatial position of pixels as the distinguishing feature, thus sensitive to FG/BG distributions overlapping (common for natural images))
+
+
 
 
 \textbf{Do classical method research stop at Optimised Colour Sampling? Can my related work be limited to these 4/2/(2+1ML) papers?}
@@ -128,6 +177,15 @@
 
 %PSNR equivalent to MSE. (supervisor)
 %MSE within unknown area
+
+Closed form: Input is trimap so the \verb|-T| parameter.
+All of them: SPEED. VS H VS W VS NUMBER OF UNKNOWN PIXELS VS PCT OF UNKNOWN PIXELS
+All of them: PSNR, ...etc?
+
+ROBUST: EVALUATE ALL CHOICES. MAYBE ON LOWRES SINCE FASTER. HIGHRES TOO SLOW!
+
+DO PRELIM EXPERIMENTS TMR DAY; IDLE TIME DINNER IS EQUALS CHIONG EXPERIMENTS. THE REST, WRITE.
+
 
 \section{Conclusions}
 \emph{The "Conclusions" sections should draw some insights from the work done, suggest future directions.}
@@ -252,14 +310,14 @@ Provided this project is not over-ambitious, I would be happy to investigate any
 \bibliography{refs}
 \newpage
 \appendix
-\section{Notation}
-For clarity I use the following notation, which mimics how I'd handwrite vectors and matrices:
+\section{Mathematical Notation}
+The (perhaps usual) notational standard of denoting scalars as unbolded, vectors as lowercase bolded and matrices as uppercase bolded does not work for the subfield of image matting, as capitalisation is freely intermixed for scalar, vector and matrix quantities. For clarity, I adopt the following notation for this report, which mimics how I'd handwrite vectors and matrices:
 \begin{itemize}
     \item Scalars are unbolded (e.g.\ $k$).
     \item Vectors are bolded and underlined once, and their scalar elements referred to as
     $$\vts \mu = \bmat{\mu_0 \\ \vdots \\ \mu_{n-1}}  \qquad \vt I =\bmat{I_0 \\ \vdots \\ I_{n-1}}$$
     for length-$n$ vectors $\vts\mu, \vt I$. All vectors are column-vectors by default; row vectors are written with the transpose operator
-    $$\vts\mu^T = \bmat{\mu_0 & \cdots & \mu_{n-1}} \qquad \vt I^T = \bmat{I_0 & \cdots & I_{n-1}}$$
+    $$\vts\mu^T = \bmat{\mu_0 & \cdots & \mu_{n-1}} \qquad \vt I^T = \bmat{I_0 & \cdots & I_{n-1}}.$$
     \item Matrices are bolded and underlined twice, and their vector rows/columns and scalar elements referred to as such:
     $$\mt I = \bmat{\vt r_0^T \\ \vdots \\ \vt r_{m-1}^T } = \bmat{\vt c_0 & \cdots & \vt c_{n-1}} = \bmat{
         I_{0,0} & I_{0,1} & \cdots & I_{0,n-1} \\
@@ -269,296 +327,137 @@ For clarity I use the following notation, which mimics how I'd handwrite vectors
     }$$
     for a $m\times n$ matrix $\mt I$ whose rows are $\{\vt r_0^T, \dots, \vt r_{m-1}^T\}$, columns are $\{\vt c_0, \dots, \vt c_{n-1}\}$, and elements are\\$\{I_{0,0}, \dots, I_{m-1,n-1}\}$.
     \item Identity matrices, one-vectors and zero-vectors are subscripted with their size (Eg.\ $\mt I_{3\times 3}$ is a $3\times 3$ identity matrix, $\vt{1}_{1\times 3}$ is a length-$3$ row one-vector, and $\vt{0}_{3\times 1}$ is a length-$3$ column zero-vector.)
-    \item Where subscripts are used parametrise a vector, rather than indexing elements of a higher dimension mathematical structure (e.g. elements of a vector/matrix as used above), I use brackets, such as $w_{(k)}, \vts \mu_{(k)}, \mt G_{(k)}$. These can also be thought as functions that take $k$ as input and output a scalar, vector and matrix respectively.
+    \item Subscripts are by default used to index elements of a vector or matrix, as shown above. Where subscripts are required to \emph{parametrise (i.e.\ express a different version of)} a vector/matrix instead, I bracket them, such as $w_{(k)}, \vts \mu_{(k)}, \mt G_{(k)}$.
 \end{itemize}
 
-\section{Theorem 1}
-This appendix presents the proof for the greyscale and colour version of Theorem 1. The proofs are structurally identical. The colour version just involves more matrix definitions and gymnastics.
+\section{Proof of Theorem 1}
+To the best of my knowledge, there is no full proof of Theorem 1 available on the public domain. The original paper \cite{closed-form-matting} and Li et al.\ \cite{closed-form-survey} present partial proofs for the greyscale case, but the coloured image case is omitted. I present the full proof of the coloured image case.
+% This appendix presents the proof for the greyscale and colour version of Theorem 1. The proofs are structurally identical. The colour version just involves more matrix definitions and gymnastics.
 
-\subsection{Common Definitions}
-We consider images of height $H$ and width $W$, and index pixels from $\{0,\dots,HW-1\}$.
-
-The set of the pixel indices in a $M\times M$ square neighbourhood of pixel $k\in\{0,\dots,HW-1\}$ is represented as the set
-$$w_{(k)} = \{j \in \mathbb{Z} \mid j\text{ is in the $M\times M$ square neighbourhood of pixel }k\}$$
-with the caveat that pixel index $j$ is allowed to venture outside of $\{0,\dots, HW-1\}$. Image values at indices outside of $\{0,\dots,HW-1\}$ are zero by definition (i.e.\ we zero-pad images to allow for window operations centred at each pixel $k\in\{0,\dots, HW-1\}$).
-
-As a concrete example, the paper uses a default of $M=3$, in which case $w_{(k)}$ is defined as
+We consider images of height $H$ and width $W$, and index pixels from $\{0,\dots,HW-1\}$. We enforce the colour line model \cite[Theorem 2]{closed-form-matting} in local $M\times M$ square neighbourhoods of pixels, where $M$ is an odd integer hyperparameter typically set to $M=3$. For simplicity (also done in the author's code implementation), neighbourhood centres $k$ only come from the inner $\left(H-2\cdot \frac{M-1}{2}\right)\times \left(W-2\cdot \frac{M-1}{2}\right)$ image to avoid neighbourhoods including out-of-bound pixels. Let $K\subset \{0,\dots,HW-1\}$ be the set of valid neighbourhood centres. Then, for a given neighbourhood centre $k\in K$, the neighbourhood $w_{(k)}$ is defined as
 $$ w_{(k)} = \{k-W-1, k-W, k-W+1, k-1, k, k+1, k+W-1, k+W, k+W+1\}.$$
 %Since the proofs involve matrices of fixed sizes that depend on $M$,
 For notational convenience in the proofs, $w_{(k)}$ will always be expressed in the form
 $$w_{(k)} = \left\{n_0, \dots, n_{M^2-1} \right\}$$
-with $\left|w_{(k)}\right|=M^2$.
-%where some trailing neighbours are ``undefined'' if $\left|w_{(k)}\right|<M^2$. As an concrete example, for a $4\times 4$ image we have image indices ranging from 0--15. For $M=3$, we have
-%\begin{align*}
-%    w_{(0)} &= \{0,1,4,5\}\\
-%    &= (n_0,n_1,n_2,n_3,n_4,n_5,n_6,n_7,n_8)\\
-%    &= (0,1,4,5,\nullkw,\nullkw,\nullkw,\nullkw,\nullkw).
-%\end{align*}
-%Treatment of $\nullkw$s will be made clear later. The proofs will always only reference at most one window parameter $i$, so there is no ambiguity on the centre of the window $(n_0,\dots,n_{W^2-1})$. I believe this is a reasonable compromise achieving both succinctness and clarity.
+with $n_0,\dots,n_{M^2-1}\in\{0,\dots,HW-1\}$.
 
-\subsection{Statement (Greyscale)}
-The greyscale pixel values of an image with height $H$ and width $W$ is represented as an length-$HW$ vector
-$$\vt I = \bmat{
-    I_{0}\\
-    \vdots\\
-    I_{HW-1}}.$$
-We zero-pad images as necessary to allow for window operations (of size $M\times M$) centred at each pixel $\in\{0,\dots,HW-1\}$. When accessing elements of $\mt I$ outside of indices $\{0, \dots, HW-1\}$, the value is 0 by definition.
-
-The alpha mask is represented as a length-$HW$ vector
+\subsection{Statement}
+The RGB pixel values of an image with height $H$ and width $W$ is represented as the $HW\times3$ matrix
+$$\mt I = \bmat{
+    I_{0,R} & I_{0,G} &  I_{0,B} \\
+    \vdots & \vdots & \vdots \\
+    I_{HW-1,R} & I_{HW-1,G} &  I_{HW-1,B}
+} = \bmat{\vt I_0^T \\ \vdots \\ \vt I_{HW-1}^T}$$
+where for $i\in\{0,\dots,HW-1\}$, $\vt I_i^T = \bmat{I_{i,R} & I_{i,G} & I_{i, B}}$ is the RGB values at pixel position $i$. The alpha mask is represented as a length-$HW$ vector
 $$\vts\alpha = \bmat{\alpha_0\\\vdots\\\alpha_{HW-1}}.$$
 Define the image cost function $J(\vts\alpha)$ as
 \begin{align*}
-    J(\vts\alpha) &= \min_{\vt a,\vt b} J(\vts\alpha, \vt a, \vt b)\\
-    &= \min_{\vt a,\vt b} \sum_{k=0}^{HW-1} \left(\sum_{m=0}^{M^2-1} \left(\alpha_{n_m} - a_kI_{n_m} - b_k\right)^2 + \epsilon a_k^2 \right)%\\
+    J(\vts\alpha) &= \min_{\mt a,\vt b} J(\vts\alpha, \mt a, \vt b)\\
+    &= \min_{\mt a,\vt b} \sum_{k\in K} \left(\sum_{m=0}^{M^2-1} \left(\alpha_{n_m} - \vt a_k^T \vt I_{n_m} - b_k\right)^2 + \epsilon \vt a_k^T \vt a_k \right)%\\
 %    &= \min_{\vts \alpha} \sum_{j=0}^{HW-1} \left(\sum_{i=0}^{HW-1} (\alpha_i - \hat{a}_jI_i - \hat{b}_j)^2 + \epsilon \hat{a}_j^2 \right)
 \end{align*}
-for some length-$HW$ vectors $\vt a, \vt b$ and neighbourhood $w_{(k)}=\{n_0,\dots,n_{M^2-1}\}$.
-
-Then, the theorem states that
+for some $HW\times 3$ matrix $\mt a=\left[\begin{smallmatrix}\vt a_{0}^T \\ \vdots \\ \vt a_{HW-1}^T\end{smallmatrix}\right]$ defined similarly as $\mt I$, some length-$HW$ vector $\vt b$, and neighbourhoods $w_{(k)}=\{n_0,\dots,n_{M^2-1}\}$. Then, the theorem states that
 $$J(\vts \alpha) = \vts \alpha^T \mt L\, \vts \alpha$$
-where $L$ is an $HW\times HW$ matrix, whose $(i,j)$-th entry (for $i,j\in\{0,\dots,HW-1\}$) is
-$$L_{i,j} = \sum_{\substack{k\in\{0,\dots,HW-1\}:\\i\in w_{(k)}\wedge j\in w_{(k)}}} \left( \delta_{ij} - \frac1{M^2}\left(1 + \frac1{\frac\epsilon{M^2} + \sigma_{(k)}^2} \left({I}_i - \mu_{(k)}\right) \left({I}_j - \mu_{(k)}\right) \right) \right)$$
+where $L$ is the $HW\times HW$ \emph{matting Laplacian} matrix, whose $(i,j)$-th entry (for $i,j\in\{0,\dots,HW-1\}$) is
+$$L_{i,j} = \sum_{\substack{k\in K:\\i\in w_k\wedge j\in w_k}} \left( \delta_{ij} - \frac1{M^2}\left(1 + \left(\vt{I}_i - \vts \mu_{(k)}\right)^T \left(\mts \Sigma_{(k)} + \frac\epsilon{M^2} \mt{I}_{3\times 3}\right)^{-1} \left(\vt{I}_j - \vts \mu_{(k)}\right) \right) \right)$$
 where
 \begin{itemize}
     \item $\delta_{ij} = \begin{cases}
         1&\text{if $i=j$}\\
         0&\text{if $i\neq j$}
     \end{cases}$ is the Kronecker delta function,
-    \item \begin{align*}
-        \mu_{(k)} &= \frac1{M^2} \sum_{n\in w_{(k)}} I_{n} \\&= \frac1{M^2} \sum_{m=0}^{M^2-1} I_{n_m}
-    \end{align*} is the mean of the pixel values in the neighbourhood of pixel $k$, and
-    \item \begin{align*}
-        \sigma^2_{(k)} &= \frac1{M^2} \sum_{n\in w_{(k)}} \left(I_n- \mu_{(k)}\right)^2 \\
-        &=  \frac1{M^2} \sum_{m=0}^{M^2-1} \left(I_{n_m}- \mu_{(k)}\right)^2 \\
-        &=  \frac1{M^2} \sum_{m=0}^{M^2-1} I_{n_m}^2 - \mu_{(k)}^2 \qquad \text{(since $\mathbb{E}\left((X-\mu)^2\right) = \mathbb{E}\left(X^2\right) - \mu^2$)}
-    \end{align*} is the variance of the pixel values in the neighbourhood of pixel $k$.
+    \item $\begin{aligned}[t]
+        \vts \mu_{(k)} &= \frac1{M^2} \sum_{n\in w_{(k)}} \vt I_{n} = \frac1{M^2} \sum_{m=0}^{M^2-1} \vt I_{n_m} \\
+        &= \bmat{\mu_{(k)R} \\ \mu_{(k)G} \\ \mu_{(k)B}}
+    \end{aligned}$ \\
+    is the length-$3$ vector mean of the RGB pixel values in the neighbourhood of pixel $k$, and
+    \item $\begin{aligned}[t]
+        \mts \Sigma_{(k)}
+        &= \frac1{M^2} \sum_{n\in w_{(k)}} \vt I_{n} \vt I_{n}^T  - \vts \mu_{(k)} \vts \mu_{(k)}^T = \frac1{M^2} \sum_{m=0}^{M^2-1} \vt I_{n_m} \vt I_{n_m}^T  - \vts \mu_{(k)} \vts \mu_{(k)}^T \\
+        &= \left[\begin{smallmatrix}
+            \frac1{M^2} \sum_{m=0}^{M^2-1} I_{n_m,R}I_{n_m,R} - \mu_{(k)R}\mu_{(k)R} & \frac1{M^2} \sum_{m=0}^{M^2-1} I_{n_m,R}I_{n_m,G} - \mu_{(k)R}\mu_{(k)G} & \frac1{M^2} \sum_{m=0}^{M^2-1} I_{n_m,R}I_{n_m,B} - \mu_{(k)R}\mu_{(k)B}\\
+            \frac1{M^2} \sum_{m=0}^{M^2-1} I_{n_m,G}I_{n_m,R} - \mu_{(k)G}\mu_{(k)R} & \frac1{M^2} \sum_{m=0}^{M^2-1} I_{n_m,G}I_{n_m,G} - \mu_{(k)G}\mu_{(k)G} & \frac1{M^2} \sum_{m=0}^{M^2-1} I_{n_m,G}I_{n_m,B} - \mu_{(k)G}\mu_{(k)B}\\
+            \frac1{M^2} \sum_{m=0}^{M^2-1} I_{n_m,B}I_{n_m,R} - \mu_{(k)B}\mu_{(k)R} & \frac1{M^2} \sum_{m=0}^{M^2-1} I_{n_m,B}I_{n_m,G} - \mu_{(k)B}\mu_{(k)G} & \frac1{M^2} \sum_{m=0}^{M^2-1} I_{n_m,B}I_{n_m,B} - \mu_{(k)B}\mu_{(k)B}
+       \end{smallmatrix}\right]
+    \end{aligned}$\\
+    is the $3\times 3$ covariance matrix (symmetric) of the pixel values in the neighbourhood of pixel $k$.
 \end{itemize}
-\subsection{Proof (Greyscale)}
-We first re-write $J(\vts\alpha)$ in matrix notation:
+
+\subsection{Proof}
+Firstly, for a given neighbourhood centre $k\in K$ with neighbourhood $w_{(k)}=\{n_0,\dots,n_{W^2-1}\}$, we define the $M^2\times 3$ matrix
+$$\mt A_{(k)} \triangleq \bmat{\vt I_{n_0}^T \\ \vdots \\ \vt I_{n_{M^2-1}}^T}$$
+which contains the RGB pixel values in the neighbourhood of pixel $k$. We then re-write $J(\vts\alpha)$ in matrix notation:
 \begin{align*}
-    J(\vts\alpha) &= \min_{\vt a,\vt b} \sum_{k=0}^{HW-1} \left(\sum_{m=0}^{M^2-1} \left(\alpha_{n_m} - a_kI_{n_m} - b_k\right)^2 + \epsilon a_k^2 \right) \\
-    &= \sum_{k=0}^{HW-1}  \min_{a_k,b_k} \left\| \bmat{I_{n_0} & 1 \\ \vdots & \vdots \\ I_{n_{M^2-1}} & 1 \\ \sqrt\epsilon & 0} \bmat{a_k\\b_k} - \bmat{\alpha_{n_0} \\ \vdots \\ \alpha_{n_{M^2-1}} \\ 0} \right\|^2 \\
-    &\triangleq \sum_{k=0}^{HW-1} \min_{a_k,b_k} \left\| \mt G_{(k)} \bmat{a_k\\b_k} - \vts{\bar{\alpha}}_{(k)} \right\|^2\\
-    &\quad\quad\ \textgrey{\text{where $\mt G_{(k)}$ is the $(M^2+1) \times 2$ matrix defined in the previous line}}\\
-    &\quad\quad\ \textgrey{\text{and $\vts{\bar{\alpha}}_{(k)}$ is the length-$(M^2+1)$ vector defined in the previous line}}\\
-    &= \sum_{k=0}^{HW-1} \left\| \mt G_{(k)} \bmat{\hat{a}_k\\\hat{b}_k} - \vts{\bar{\alpha}}_{(k)} \right\|^2
+    J(\vts\alpha) &= \min_{\mt a,\vt b} \sum_{k\in K} \left(\sum_{m=0}^{M^2-1} \left(\alpha_{n_m} - \vt a_k^T \vt I_{n_m} - b_k\right)^2 + \epsilon \vt a_k^T \vt a_k \right) \\
+    &= \sum_{k\in K}  \min_{\vt a_k,b_k} \left\| \bmat{\mt A_{(k)} & \vt 1_{M^2\times 1} \\ \sqrt\epsilon \mt I_{3\times 3} & \vt 0_{3\times1}} \bmat{\vt a_k\\b_k} - \bmat{\alpha_{n_0} \\ \vdots \\ \alpha_{n_{M^2-1}} \\ 0 \\ 0 \\ 0} \right\|^2 \\
+    &\triangleq \sum_{k\in K} \min_{\vt a_k,b_k} \left\| \mt G_{(k)} \bmat{\vt a_k\\b_k} - \vts{\bar{\alpha}}_{(k)} \right\|^2\\
+    &\quad\quad\ \textgrey{\text{where $\mt G_{(k)}$ is the $(M^2+3) \times 4$ matrix defined in the previous line}}\\
+    &\quad\quad\ \textgrey{\text{and $\vts{\bar{\alpha}}_{(k)}$ is the length-$(M^2+3)$ vector defined in the previous line}}\\
+    &= \sum_{k\in K} \left\| \mt G_{(k)} \bmat{\hat{\vt a}_k\\\hat{b}_k} - \vts{\bar{\alpha}}_{(k)} \right\|^2
 \end{align*}
-We first eliminate $\vt{\hat{a}},\vt{\hat{b}}$ from the expression, by performing the minimisation for a given $\vts\alpha$ using the pseudo-inverse:
+We can eliminate $\hat{\vt{a}}_k,\hat{b}_k$ by performing their minimisation (for some fixed $\vts\alpha$) using the pseudo-inverse:
 \begin{align*}
-    \hat{a}_k, \hat{b}_k &= \argmin_{a_k,b_k} \left\| \mt G_{(k)} \bmat{a_k\\b_k} - \vts{\bar{\alpha}}_{(k)} \right\|^2\\
-    \bmat{\hat{a}_k\\\hat{b}_k} &= \left(\mt G_{(k)}^T \mt G_{(k)} \right)^{-1} \mt G_{(k)}^T \vts{\bar{\alpha}}_{(k)}
+    \hat{\vt a}_k, \hat{b}_k &= \argmin_{\vt a_k,b_k} \left\| \mt G_{(k)} \bmat{\vt a_k\\b_k} - \vts{\bar{\alpha}}_{(k)} \right\|^2\\
+    \bmat{\hat{\vt a}_k\\\hat{b}_k} &= \left(\mt G_{(k)}^T \mt G_{(k)} \right)^{-1} \mt G_{(k)}^T \vts{\bar{\alpha}}_{(k)}
 \end{align*}
 Continuing the simplification of $J(\vts\alpha)$:
 \begin{align*}
-    J(\vts\alpha) &=  \sum_{k=0}^{HW-1} \left\| \mt G_{(k)}\left(\mt G_{(k)}^T \mt G_{(k)} \right)^{-1} \mt G_{(k)}^T \vts{\bar{\alpha}}_{(k)}  - \vts{\bar{\alpha}}_{(k)} \right\|^2\\
-    &=  \sum_{k=0}^{HW-1} \left\| \left(\mt I_{(M^2+1)\times(M^2+1)} -  \mt G_{(k)}\left(\mt G_{(k)}^T \mt G_{(k)} \right)^{-1} \mt G_{(k)}^T \right) \vts{\bar{\alpha}}_{(k)}   \right\|^2\\
-    &\triangleq  \sum_{k=0}^{HW-1} \left\| \mt{\bar{G}}_{(k)} \vts{\bar{\alpha}}_{(k)}   \right\|^2\\
-    &\quad\quad\ \textgrey{\text{where $\mt{\bar{G}}_{(k)}$ is the $(M^2+1)\times(M^2+1)$ matrix defined in the previous line}}\\
-    &= \sum_{k=0}^{HW-1} \vts{\bar{\alpha}}_{(k)}^T \mt{\bar{G}}_{(k)}^T \mt{\bar{G}}_{(k)} \vts{\bar{\alpha}}_{(k)}\\
-    &= \sum_{k=0}^{HW-1} \vts{\bar{\alpha}}_{(k)}^T  \mt{\bar{G}}_{(k)} \vts{\bar{\alpha}}_{(k)} \qquad\text{(by Lemma \ref{lemma1})}\\
-    &= \sum_{k=0}^{HW-1} \sum_{y=0}^{M^2} \sum_{x=0}^{M^2} \left({\bar{\alpha}}_{(k)}\right)_x  \left({\bar{G}}_{(k)}\right)_{x,y} \left({\bar{\alpha}}_{(k)}\right)_y
+    J(\vts\alpha) &=  \sum_{k\in K} \left\| \mt G_{(k)}\left(\mt G_{(k)}^T \mt G_{(k)} \right)^{-1} \mt G_{(k)}^T \vts{\bar{\alpha}}_{(k)}  - \vts{\bar{\alpha}}_{(k)} \right\|^2\\
+    &=  \sum_{k\in K} \left\| \left(\mt I_{(M^2+3)\times(M^2+3)} -  \mt G_{(k)}\left(\mt G_{(k)}^T \mt G_{(k)} \right)^{-1} \mt G_{(k)}^T \right) \vts{\bar{\alpha}}_{(k)}   \right\|^2\\
+    &\triangleq  \sum_{k\in K} \left\| \mt{\bar{G}}_{(k)} \vts{\bar{\alpha}}_{(k)}   \right\|^2\\
+    &\quad\quad\ \textgrey{\text{where $\mt{\bar{G}}_{(k)}$ is the $(M^2+3)\times(M^2+3)$ matrix defined in the previous line}}\\
+    &= \sum_{k\in K} \vts{\bar{\alpha}}_{(k)}^T \mt{\bar{G}}_{(k)}^T \mt{\bar{G}}_{(k)} \vts{\bar{\alpha}}_{(k)}\\
+    &= \sum_{k\in K} \vts{\bar{\alpha}}_{(k)}^T  \mt{\bar{G}}_{(k)} \vts{\bar{\alpha}}_{(k)} \qquad\text{(by Lemma \ref{lemma1})}\\
+    &= \sum_{k\in K} \sum_{y=0}^{M^2+2} \sum_{x=0}^{M^2+2} \left({\bar{\alpha}}_{(k)}\right)_x  \left({\bar{G}}_{(k)}\right)_{x,y} \left({\bar{\alpha}}_{(k)}\right)_y
 \end{align*}
-The last element $\left({\bar{\alpha}}_{(k)}\right)_{M^2}$ of $\vts{\bar{\alpha}}_{(k)}$ is always zero by definition above. Therefore, the summation bounds for $x,y$ can be reduced, and we thus only need consider the upper-left $M^2\times M^2$ submatrix of ${\mt{\bar{G}}}_{(k)}$ in Lemma \ref{lemma2}:
+The last three elements $\left({\bar{\alpha}}_{(k)}\right)_{M^2}, \left({\bar{\alpha}}_{(k)}\right)_{M^2+1}, \left({\bar{\alpha}}_{(k)}\right)_{M^2+2}$ of $\vts{\bar{\alpha}}_{(k)}$ are always zero by definition above. Therefore, the summation bounds for $x,y$ can be reduced: %, and we thus only need consider the upper-left $M^2\times M^2$ submatrix of ${\mt{\bar{G}}}_{(k)}$ in the proof of Lemma \ref{lemma2}:
 \begin{align*}
-    J(\vts\alpha) &= \sum_{k=0}^{HW-1} \sum_{y=0}^{M^2-1} \sum_{x=0}^{M^2-1} \alpha_{n_x}  \left({\bar{G}}_{(k)}\right)_{x,y} \alpha_{n_y}\\
-    &= \sum_{k=0}^{HW-1} \sum_{y=0}^{M^2-1} \sum_{x=0}^{M^2-1} \underbracket{\alpha_{n_x}  \left( \delta_{xy} - \frac1{M^2}\left(1 + \frac1{\frac\epsilon{M^2} + \sigma_{(k)}^2} \left({I}_{n_x} - \mu_{(k)}\right) \left({I}_{n_y} - \mu_{(k)}\right) \right) \right) \alpha_{n_y}}_{(*)}\\
+    J(\vts\alpha) &= \sum_{k\in K} \sum_{y=0}^{M^2-1} \sum_{x=0}^{M^2-1} \alpha_{n_x}  \left({\bar{G}}_{(k)}\right)_{x,y} \alpha_{n_y}\\
+    &= \sum_{k\in K} \sum_{y=0}^{M^2-1} \sum_{x=0}^{M^2-1} \underbracket{\alpha_{n_x}  \left( \delta_{xy} - \frac1{M^2}\left(1 + \left(\vt{I}_{n_x} - \vts \mu_{(k)}\right)^T \left(\mts \Sigma_{(k)} + \frac\epsilon{M^2} \mt{I}_{3\times 3}\right)^{-1} \left(\vt{I}_{n_y} - \vts \mu_{(k)}\right) \right) \right) \alpha_{n_y}}_{(*)}\\
     &\quad\ \text{(by Lemma \ref{lemma2})}
 \end{align*}
-\hl{The above expression performs a window sum over a $M\times M$ window for each window centre $k\in\{0,\dots,HW-1\}$. Equivalently, we can group together all summands $(*)$ that have the same pair $(n_x,n_y)\in\{0,\dots,HW-1\}^2$, and consider all possible pairs $(i,j)\in\{0,\dots,HW-1\}^2$:}
+The above expression performs a window sum over a $M\times M$ window for each neighbourhood centre $k\in K$. Equivalently, we can group together all summands $(*)$ that have the same pair $(n_x,n_y)\in\{0,\dots,HW-1\}^2$, and consider all possible pairs $(i,j)\in\{0,\dots,HW-1\}^2$:
 \begin{align*}
-    J(\vts\alpha) &= \sum_{j=0}^{HW-1} \sum_{i=0}^{HW-1} \alpha_i \left(\sum_{\substack{k\in\{0,\dots,HW-1\}:\\i\in w_{(k)}\wedge j\in w_{(k)}}} \left( \delta_{ij} - \frac1{M^2}\left(1 + \frac1{\frac\epsilon{M^2} + \sigma_{(k)}^2} \left({I}_{i} - \mu_{(k)}\right) \left({I}_{j} - \mu_{(k)}\right) \right) \right)\right) \alpha_j\\
+    J(\vts\alpha) &= \sum_{j=0}^{HW-1} \sum_{i=0}^{HW-1} \alpha_i \left(\sum_{\substack{k\in K:\\i\in w_{(k)}\wedge j\in w_{(k)}}} \left( \delta_{ij} - \frac1{M^2}\left(1 + \left(\vt{I}_{i} - \vts \mu_{(k)}\right)^T \left(\mts \Sigma_{(k)} + \frac\epsilon{M^2} \mt{I}_{3\times 3}\right)^{-1} \left(\vt{I}_{j} - \vts \mu_{(k)}\right) \right) \right)\right) \alpha_j\\
     &\triangleq \sum_{j=0}^{HW-1} \sum_{i=0}^{HW-1} \alpha_i L_{i,j} \alpha_j\\
     &\quad\quad\ \textgrey{\text{where $\mt L$ is the $HW\times HW$ sparse matrix defined in the previous line}}\\
     &= \vts \alpha^T \mt L\, \vts \alpha
 \end{align*}
-where the notational change from $\delta_{xy}$ to $\delta_{ij}$ is justified because $\delta_{xy} = 1 \iff x=y \iff n_x = n_y \iff i = j\\ \iff \delta_{ij}=1$. \hfill$\square$
+where the notational change from $\delta_{xy}$ to $\delta_{ij}$ is justified because $\delta_{xy} = 1 \iff x=y \iff n_x = n_y \iff i = j\\ \iff \delta_{ij}=1$. We are done. \hfill$\square$
 % Observe that each alpha value $\alpha_j$ is involved in $M^2$ such window sums (centred around $M^2$ different window centres).
 
 
 \begin{lemma}\label{lemma1}
-    $\forall k\in\{0,\dots,HW-1\}.\ \mt{\bar{G}}_{(k)}^T \mt{\bar{G}}_{(k)} = \mt{\bar{G}}_{(k)}$
+    $\forall k \in K.\ \mt{\bar{G}}_{(k)}^T \mt{\bar{G}}_{(k)} = \mt{\bar{G}}_{(k)}$
     \begin{proof}
-        For arbitrary $i\in\{0,\dots,HW-1\}$:
+        For arbitrary $k\in K$:
         \begin{align*}
-            \mt{\bar{G}}_{(k)}^T \mt{\bar{G}}_{(k)} &= \left(\mt I_{(M^2+1)\times(M^2+1)} -  \mt G_{(k)} \left(\left(\mt G_{(k)}^T \mt G_{(k)} \right)^{-1}\right)^T \mt G_{(k)}^T \right) \left(\mt I_{(M^2+1)\times(M^2+1)} -  \mt G_{(k)}\left(\mt G_{(k)}^T \mt G_{(k)} \right)^{-1} \mt G_{(k)}^T \right)\\
-            &= \mt I_{(M^2+1)\times(M^2+1)} - \mt G_{(k)}\left(\mt G_{(k)}^T \mt G_{(k)} \right)^{-1} \mt G_{(k)}^T - \mt G_{(k)} \left(\left(\mt G_{(k)}^T \mt G_{(k)} \right)^{-1}\right)^T \mt G_{(k)}^T \\
+            \mt{\bar{G}}_{(k)}^T \mt{\bar{G}}_{(k)} &= \left(\mt I_{(M^2+3)\times(M^2+3)} -  \mt G_{(k)} \left(\left(\mt G_{(k)}^T \mt G_{(k)} \right)^{-1}\right)^T \mt G_{(k)}^T \right) \left(\mt I_{(M^2+3)\times(M^2+3)} -  \mt G_{(k)}\left(\mt G_{(k)}^T \mt G_{(k)} \right)^{-1} \mt G_{(k)}^T \right)\\
+            &= \mt I_{(M^2+3)\times(M^2+3)} - \mt G_{(k)}\left(\mt G_{(k)}^T \mt G_{(k)} \right)^{-1} \mt G_{(k)}^T - \mt G_{(k)} \left(\left(\mt G_{(k)}^T \mt G_{(k)} \right)^{-1}\right)^T \mt G_{(k)}^T \\
             &\quad\ + \mt G_{(k)} \left(\left(\mt G_{(k)}^T \mt G_{(k)} \right)^{-1}\right)^T \cancel{\mt G_{(k)}^T \mt G_{(k)}\left(\mt G_{(k)}^T \mt G_{(k)} \right)^{-1}} \mt G_{(k)}^T \\
-            &= \mt I_{(M^2+1)\times(M^2+1)} - \mt G_{(k)}\left(\mt G_{(k)}^T \mt G_{(k)} \right)^{-1} \mt G_{(k)}^T \\
+            &= \mt I_{(M^2+3)\times(M^2+3)} - \mt G_{(k)}\left(\mt G_{(k)}^T \mt G_{(k)} \right)^{-1} \mt G_{(k)}^T \\
             &= \mt{\bar{G}}_{(k)}
         \end{align*}
     \end{proof}
 \end{lemma}
 
 \begin{lemma}\label{lemma2}
-    $\forall k\in\{0,\dots,HW-1\}.\ \forall x,y\in\{0,\dots, M^2-1\}.$
-    $$\left({\bar{G}}_{(k)}\right)_{x,y} = \delta_{xy} - \frac1{M^2}\left(1 + \frac1{\frac\epsilon{M^2} + \sigma_{(k)}^2} \left({I}_{n_x} - \mu_{(k)}\right) \left({I}_{n_y} - \mu_{(k)}\right) \right) $$
-    Note that $\mt{\bar{G}}_{(k)}$ is a $(M^2+1)\times (M^2+1)$ matrix, but we only find the expression of its scalar elements in its upper-left $M^2\times M^2$ submatrix.
-    \begin{proof}
-        For arbitrary $i\in\{0,\dots,HW-1\}$, by definition we have
-        $$\mt{\bar{G}}_{(k)} = \mt I_{(M^2+1)\times(M^2+1)} - \mt G_{(k)}\left(\mt G_{(k)}^T \mt G_{(k)} \right)^{-1} \mt G_{(k)}^T.$$
-        Here are two useful auxiliary definitions from the theorem statement:
-        \begin{align*}
-            \mu_{(k)} &= \frac1{M^2} \sum_{m=0}^{M^2-1} I_{n_m}\\
-            \sigma^2_{(k)} &= \frac1{M^2} \sum_{m=0}^{M^2-1} I_{n_m}^2 - \mu_{(k)}^2
-        \end{align*}
-        To find the $(x,y)$-th element of this matrix, we consider the expression from inside-out.
-        \begin{align*}
-            \mt G_{(k)}^T \mt G_{(k)} &= \bmat{I_{n_0} & \cdots & I_{n_{M^2-1}} & \sqrt\epsilon \\ 1 & \cdots & 1 & 0} \bmat{I_{n_0} & 1 \\ \vdots & \vdots \\ I_{n_{M^2-1}} & 1 \\ \sqrt\epsilon & 0}\\
-            &= \bmat{\sum_{m=0}^{M^2-1} I_{n_m}^2 + \epsilon & \sum_{m=0}^{M^2-1} I_{n_m} \\ \sum_{m=0}^{M^2-1} I_{n_m} & M^2 }\\
-            &=  \bmat{\sum_{m=0}^{M^2-1} I_{n_m}^2 + \epsilon & M^2 \mu_{(k)} \\ M^2 \mu_{(k)} & M^2 }
-        \end{align*}
-        To invert a $2\times 2$ matrix, we use \cite[eq.\ (31)]{matrix-cookbook}:
-        \begin{align*}
-            \left(\mt G_{(k)}^T \mt G_{(k)}\right)^{-1} &= \frac1{M^2\sum_{m=0}^{M^2-1} I_{n_m}^2 + M^2\epsilon - M^4 \mu_{(k)}^2}  \bmat{M^2 & -M^2 \mu_{(k)} \\ -M^2 \mu_{(k)} & \sum_{m=0}^{M^2-1} I_{n_m}^2 + \epsilon }\\
-            &= \frac1{\sum_{m=0}^{M^2-1} I_{n_m}^2  - M^2\mu_{(k)}^2 + \epsilon}  \bmat{1 & -\mu_{(k)} \\ -\mu_{(k)} & \frac1{M^2}\left(\sum_{m=0}^{M^2-1} I_{n_m}^2 + \epsilon\right)}\\
-            &= \frac1{M^2\sigma_{(k)}^2 + \epsilon}  \bmat{1 & -\mu_{(k)} \\ -\mu_{(k)} & \frac1{M^2}\left(\sum_{m=0}^{M^2-1} I_{n_m}^2 + \epsilon\right)}
-        \end{align*}
-        We only need to consider the upper-left $M^2\times M^2$ submatrix of the following $(M^2+1)\times (M^2+1)$ matrix:
-        \begin{align*}
-            \mt G_{(k)} \left(\mt G_{(k)}^T \mt G_{(k)}\right)^{-1} \mt G_{(k)}^T &= \frac1{M^2\sigma_{(k)}^2 + \epsilon}  \bmat{I_{n_0} & 1 \\ \vdots & \vdots \\ I_{n_{M^2-1}} & 1 \\ \sqrt\epsilon & 0} \bmat{1 & -\mu_{(k)} \\ -\mu_{(k)} & \frac1{M^2}\left(\sum_{m=0}^{M^2-1} I_{n_m}^2 + \epsilon\right)} \bmat{I_{n_0} & \cdots & I_{n_{M^2-1}} & \sqrt\epsilon \\ 1 & \cdots & 1 & 0}
-        \end{align*}
-        Thus for $x,y\in\{0,\dots,M^2-1\}$:
-        \begin{align*}
-            \left(\mt G_{(k)} \left(\mt G_{(k)}^T \mt G_{(k)}\right)^{-1} \mt G_{(k)}^T\right)_{x,y}
-            &= \frac1{M^2\sigma_{(k)}^2 + \epsilon} \bmat{I_{n_x} & 1} \bmat{1 & -\mu_{(k)} \\ -\mu_{(k)} & \frac1{M^2}\left(\sum_{m=0}^{M^2-1} I_{n_m}^2 + \epsilon\right)} \bmat{I_{n_y} \\ 1}\\
-            &= \frac1{M^2\sigma_{(k)}^2 + \epsilon} \bmat{I_{n_x}-\mu_{(k)} & -\mu_{(k)}I_{n_x} + \frac1{M^2}\left(\sum_{m=0}^{M^2-1} I_{n_m}^2 + \epsilon\right)} \bmat{I_{n_y} \\ 1}\\
-            &= \frac1{M^2\sigma_{(k)}^2 + \epsilon} \left( I_{n_x}I_{n_y} - \mu_{(k)}I_{n_y} - \mu_{(k)}I_{n_x} + \frac1{M^2}\left(\sum_{m=0}^{M^2-1} I_{n_m}^2 + \epsilon\right) \right)\\
-            &= \frac1{M^2\sigma_{(k)}^2 + \epsilon} \left(\left(I_{n_x}-\mu_{(k)}\right) \left(I_{n_y}-\mu_{(k)}\right) + \cancelto{\sigma_{(k)}^2}{\frac1{M^2}\sum_{m=0}^{M^2-1} I_{n_m}^2 - \mu_{(k)}^2} + \frac1{M^2}\epsilon \right)\\
-            &= \frac1{M^2\sigma_{(k)}^2 + \epsilon} \left(I_{n_x}-\mu_{(k)}\right) \left(I_{n_y}-\mu_{(k)}\right) + \frac1{M^2}\\
-            &= \frac1{M^2}\left( 1 +  \frac1{\sigma_{(k)}^2 + \frac\epsilon{M^2}}\left(I_{n_x}-\mu_{(k)}\right) \left(I_{n_y}-\mu_{(k)}\right) \right)
-        \end{align*}
-        We are done:
-        \begin{align*}
-            \left({\bar{G}}_{(k)}\right)_{x,y} &= \left(\mt I_{(M^2+1)\times(M^2+1)} - \mt G_{(k)} \left(\mt G_{(k)}^T \mt G_{(k)}\right)^{-1} \mt G_{(k)}^T\right)_{x,y} \\
-            &= \delta_{xy} - \frac1{M^2}\left( 1 +  \frac1{\frac\epsilon{M^2}+\sigma_{(k)}^2}\left(I_{n_x}-\mu_{(k)}\right) \left(I_{n_y}-\mu_{(k)}\right) \right)
-        \end{align*}
-    \end{proof}
-\end{lemma}
-
-
-\subsection{Statement (Colour)}
-The RGB pixel values of an image with height $H$ and width $W$ is represented as a $HW\times3$ matrix
-$$\mt I = \bmat{
-    I_{0,R} & I_{0,G} &  I_{0,B} \\
-    \vdots & \vdots & \vdots \\
-    I_{HW-1,R} & I_{HW-1,G} &  I_{HW-1,B}
-} = \bmat{\vt I_0^T \\ \vdots \\ \vt I_{HW-1}^T}$$
-where for $i\in\{0,\dots,HW-1\}$, $\vt I_i = \bmat{I_{i,R} \\ I_{i,G} \\ I_{i, B}}$ is the RGB values at pixel position $i$. We zero-pad images as necessary to allow for window operations (of size $M\times M$) centred at each pixel $\in\{0,\dots,HW-1\}$. When accessing rows of $\mt I$ outside of indices $\{0, \dots, HW-1\}$, the value is $\vt 0_{1\times 3}$ by definition.
-
-The alpha mask is represented as a length-$HW$ vector
-$$\vts\alpha = \bmat{\alpha_0\\\vdots\\\alpha_{HW-1}}.$$
-Define the image cost function $J(\vts\alpha)$ as
-\begin{align*}
-    J(\vts\alpha) &= \min_{\mt a,\vt b} J(\vts\alpha, \mt a, \vt b)\\
-    &= \min_{\mt a,\vt b} \sum_{k=0}^{HW-1} \left(\sum_{m=0}^{M^2-1} \left(\alpha_{n_m} - \vt a_k^T \vt I_{n_m} - b_k\right)^2 + \epsilon \vt a_k^T \vt a_k \right)%\\
-%    &= \min_{\vts \alpha} \sum_{j=0}^{HW-1} \left(\sum_{i=0}^{HW-1} (\alpha_i - \hat{a}_jI_i - \hat{b}_j)^2 + \epsilon \hat{a}_j^2 \right)
-\end{align*}
-for some $HW\times 3$ matrix $\mt a=\bmat{\vt a_{0}^T \\ \vdots \\ \vt a_{HW-1}^T}$ defined similarly as $\mt I$, some length-$HW$ vector $\vt b$, and neighbourhood $w_{(k)}=\{n_0,\dots,n_{M^2-1}\}$.
-
-Then, the theorem states that
-$$J(\vts \alpha) = \vts \alpha^T \mt L\, \vts \alpha$$
-where $L$ is an $HW\times HW$ matrix, whose $(i,j)$-th entry (for $i,j\in\{0,\dots,HW-1\}$) is
-$$L_{i,j} = \sum_{\substack{k\in\{0,\dots,HW-1\}:\\i\in w_k\wedge j\in w_k}} \left( \delta_{ij} - \frac1{M^2}\left(1 + \left(\vt{I}_i - \vts \mu_{(k)}\right)^T \left(\mts \Sigma_{(k)} + \frac\epsilon{M^2} \mt{I}_{3\times 3}\right)^{-1} \left(\vt{I}_j - \vts \mu_{(k)}\right) \right) \right)$$
-where
-\begin{itemize}
-    \item $\delta_{ij} = \begin{cases}
-        1&\text{if $i=j$}\\
-        0&\text{if $i\neq j$}
-    \end{cases}$ is the Kronecker delta function,
-    \item \begin{align*}
-        \vts \mu_{(k)}
-        &= \frac1{M^2} \sum_{n\in w_{(k)}} \vt I_{n} \\
-        &= \frac1{M^2} \sum_{m=0}^{M^2-1} \vt I_{n_m} \\
-        &= \bmat{\mu_{(k)R} \\ \mu_{(k)G} \\ \mu_{(k)B}}
-    \end{align*} is length-$3$ vector mean of the RGB pixel values in the neighbourhood of pixel $k$, and
-    \item \begin{align*}
-        \mts \Sigma_{(k)}
-        &= \frac1{M^2} \sum_{n\in w_{(k)}} \left(\vt I_{n}-\vts \mu_{(k)}\right) \left(\vt I_{n}-\vts \mu_{(k)}\right)^T\\
-        &= \frac1{M^2} \sum_{m=0}^{M^2-1} \left(\vt I_{n_m}-\vts \mu_{(k)}\right) \left(\vt I_{n_m}-\vts \mu_{(k)}\right)^T\\
-        &= \frac1{M^2} \left[\begin{smallmatrix}
-             \sum_{m=0}^{M^2-1} \left(I_{n_m,R} - \mu_{(k)R}\right)\left(I_{n_m,R} - \mu_{(k)R}\right) & \sum_{m=0}^{M^2-1} \left(I_{n_m,R} - \mu_{(k)R}\right)\left(I_{n_m,G} - \mu_{(k)G}\right) & \sum_{m=0}^{M^2-1} \left(I_{n_m,R} - \mu_{(k)R}\right)\left(I_{n_m,B} - \mu_{(k)B}\right) \\
-             \sum_{m=0}^{M^2-1} \left(I_{n_m,G} - \mu_{(k)G}\right)\left(I_{n_m,R} - \mu_{(k)R}\right) & \sum_{m=0}^{M^2-1} \left(I_{n_m,G} - \mu_{(k)G}\right)\left(I_{n_m,G} - \mu_{(k)G}\right) & \sum_{m=0}^{M^2-1} \left(I_{n_m,G} - \mu_{(k)G}\right)\left(I_{n_m,B} - \mu_{(k)B}\right) \\
-             \sum_{m=0}^{M^2-1} \left(I_{n_m,B} - \mu_{(k)B}\right)\left(I_{n_m,R} - \mu_{(k)R}\right) & \sum_{m=0}^{M^2-1} \left(I_{n_m,B} - \mu_{(k)B}\right)\left(I_{n_m,G} - \mu_{(k)G}\right) & \sum_{m=0}^{M^2-1} \left(I_{n_m,B} - \mu_{(k)B}\right)\left(I_{n_m,B} - \mu_{(k)B}\right)
-        \end{smallmatrix}\right]\\
-        &= \left[\begin{smallmatrix}
-            \frac1{M^2} \sum_{m=0}^{M^2-1} I_{n_m,R}I_{n_m,R} - \mu_{(k)R}\mu_{(k)R} & \frac1{M^2} \sum_{m=0}^{M^2-1} I_{n_m,R}I_{n_m,G} - \mu_{(k)R}\mu_{(k)G} & \frac1{M^2} \sum_{m=0}^{M^2-1} I_{n_m,R}I_{n_m,B} - \mu_{(k)R}\mu_{(k)B}\\
-            \frac1{M^2} \sum_{m=0}^{M^2-1} I_{n_m,G}I_{n_m,R} - \mu_{(k)G}\mu_{(k)R} & \frac1{M^2} \sum_{m=0}^{M^2-1} I_{n_m,G}I_{n_m,G} - \mu_{(k)G}\mu_{(k)G} & \frac1{M^2} \sum_{m=0}^{M^2-1} I_{n_m,G}I_{n_m,B} - \mu_{(k)G}\mu_{(k)B}\\
-            \frac1{M^2} \sum_{m=0}^{M^2-1} I_{n_m,B}I_{n_m,R} - \mu_{(k)B}\mu_{(k)R} & \frac1{M^2} \sum_{m=0}^{M^2-1} I_{n_m,B}I_{n_m,G} - \mu_{(k)B}\mu_{(k)G} & \frac1{M^2} \sum_{m=0}^{M^2-1} I_{n_m,B}I_{n_m,B} - \mu_{(k)B}\mu_{(k)B}
-       \end{smallmatrix}\right]
-    \end{align*} is the $3\times 3$ covariance matrix of the pixel values in the neighbourhood of pixel $k$.
-\end{itemize}
-
-\subsection{Proof (Colour)}
-Firstly, for a centre pixel $k\in\{0,\dots,HW-1\}$ with neighbourhood $w_{(k)}=\{n_0,\dots,n_{W^2-1}\}$, we define the $M^2\times 3$ matrix
-$$\mt A_{(k)} \triangleq \bmat{\vt I_{n_0}^T \\ \vdots \\ \vt I_{n_{M^2-1}}^T}$$
-which contains the RGB pixel values in the neighbourhood of pixel $k$.
-
-We first re-write $J(\vts\alpha)$ in matrix notation:
-\begin{align*}
-    J(\vts\alpha) &= \min_{\mt a,\vt b} \sum_{k=0}^{HW-1} \left(\sum_{m=0}^{M^2-1} \left(\alpha_{n_m} - \vt a_k^T \vt I_{n_m} - b_k\right)^2 + \epsilon \vt a_k^T \vt a_k \right) \\
-    &= \sum_{k=0}^{HW-1}  \min_{\vt a_k,b_k} \left\| \bmat{\mt A_{(k)} & \vt 1_{M^2\times 1} \\ \sqrt\epsilon \mt I_{3\times 3} & \vt 0_{3\times1}} \bmat{\vt a_k\\b_k} - \bmat{\alpha_{n_0} \\ \vdots \\ \alpha_{n_{M^2-1}} \\ 0 \\ 0 \\ 0} \right\|^2 \\
-    &\triangleq \sum_{k=0}^{HW-1} \min_{a_k,b_k} \left\| \mt G_{(k)} \bmat{a_k\\b_k} - \vts{\bar{\alpha}}_{(k)} \right\|^2\\
-    &\quad\quad\ \textgrey{\text{where $\mt G_{(k)}$ is the $(M^2+3) \times 4$ matrix defined in the previous line}}\\
-    &\quad\quad\ \textgrey{\text{and $\vts{\bar{\alpha}}_{(k)}$ is the length-$(M^2+3)$ vector defined in the previous line}}\\
-    &= \sum_{k=0}^{HW-1} \left\| \mt G_{(k)} \bmat{\hat{a}_k\\\hat{b}_k} - \vts{\bar{\alpha}}_{(k)} \right\|^2
-\end{align*}
-We first eliminate $\vt{\hat{a}},\vt{\hat{b}}$ from the expression, by performing the minimisation for a given $\vts\alpha$ using the pseudo-inverse:
-\begin{align*}
-    \hat{a}_k, \hat{b}_k &= \argmin_{a_k,b_k} \left\| \mt G_{(k)} \bmat{a_k\\b_k} - \vts{\bar{\alpha}}_{(k)} \right\|^2\\
-    \bmat{\hat{a}_k\\\hat{b}_k} &= \left(\mt G_{(k)}^T \mt G_{(k)} \right)^{-1} \mt G_{(k)}^T \vts{\bar{\alpha}}_{(k)}
-\end{align*}
-Continuing the simplification of $J(\vts\alpha)$:
-\begin{align*}
-    J(\vts\alpha) &=  \sum_{k=0}^{HW-1} \left\| \mt G_{(k)}\left(\mt G_{(k)}^T \mt G_{(k)} \right)^{-1} \mt G_{(k)}^T \vts{\bar{\alpha}}_{(k)}  - \vts{\bar{\alpha}}_{(k)} \right\|^2\\
-    &=  \sum_{k=0}^{HW-1} \left\| \left(\mt I_{(M^2+3)\times(M^2+3)} -  \mt G_{(k)}\left(\mt G_{(k)}^T \mt G_{(k)} \right)^{-1} \mt G_{(k)}^T \right) \vts{\bar{\alpha}}_{(k)}   \right\|^2\\
-    &\triangleq  \sum_{k=0}^{HW-1} \left\| \mt{\bar{G}}_{(k)} \vts{\bar{\alpha}}_{(k)}   \right\|^2\\
-    &\quad\quad\ \textgrey{\text{where $\mt{\bar{G}}_{(k)}$ is the $(M^2+3)\times(M^2+3)$ matrix defined in the previous line}}\\
-    &= \sum_{k=0}^{HW-1} \vts{\bar{\alpha}}_{(k)}^T \mt{\bar{G}}_{(k)}^T \mt{\bar{G}}_{(k)} \vts{\bar{\alpha}}_{(k)}\\
-    &= \sum_{k=0}^{HW-1} \vts{\bar{\alpha}}_{(k)}^T  \mt{\bar{G}}_{(k)} \vts{\bar{\alpha}}_{(k)} \qquad\text{(by Lemma \ref{lemma3})}\\
-    &= \sum_{k=0}^{HW-1} \sum_{y=0}^{M^2+2} \sum_{x=0}^{M^2+2} \left({\bar{\alpha}}_{(k)}\right)_x  \left({\bar{G}}_{(k)}\right)_{x,y} \left({\bar{\alpha}}_{(k)}\right)_y
-\end{align*}
-The last three elements $\left({\bar{\alpha}}_{(k)}\right)_{M^2}, \left({\bar{\alpha}}_{(k)}\right)_{M^2+1}, \left({\bar{\alpha}}_{(k)}\right)_{M^2+2}$ of $\vts{\bar{\alpha}}_{(k)}$ are always zero by definition above. Therefore, the summation bounds for $x,y$ can be reduced, and we thus only need consider the upper-left $M^2\times M^2$ submatrix of ${\mt{\bar{G}}}_{(k)}$ in Lemma \ref{lemma4}:
-\begin{align*}
-    J(\vts\alpha) &= \sum_{k=0}^{HW-1} \sum_{y=0}^{M^2-1} \sum_{x=0}^{M^2-1} \alpha_{n_x}  \left({\bar{G}}_{(k)}\right)_{x,y} \alpha_{n_y}\\
-    &= \sum_{k=0}^{HW-1} \sum_{y=0}^{M^2-1} \sum_{x=0}^{M^2-1} \underbracket{\alpha_{n_x}  \left( \delta_{xy} - \frac1{M^2}\left(1 + \left(\vt{I}_{n_x} - \vts \mu_{(k)}\right)^T \left(\mts \Sigma_{(k)} + \frac\epsilon{M^2} \mt{I}_{3\times 3}\right)^{-1} \left(\vt{I}_{n_y} - \vts \mu_{(k)}\right) \right) \right) \alpha_{n_y}}_{(*)}\\
-    &\quad\ \text{(by Lemma \ref{lemma4})}
-\end{align*}
-\hl{The above expression performs a window sum over a $M\times M$ window for each window centre $k\in\{0,\dots,HW-1\}$. Equivalently, we can group together all summands $(*)$ that have the same pair $(n_x,n_y)\in\{0,\dots,HW-1\}^2$, and consider all possible pairs $(i,j)\in\{0,\dots,HW-1\}^2$:}
-\begin{align*}
-    J(\vts\alpha) &= \sum_{j=0}^{HW-1} \sum_{i=0}^{HW-1} \alpha_i \left(\sum_{\substack{k\in\{0,\dots,HW-1\}:\\i\in w_{(k)}\wedge j\in w_{(k)}}} \left( \delta_{ij} - \frac1{M^2}\left(1 + \left(\vt{I}_{i} - \vts \mu_{(k)}\right)^T \left(\mts \Sigma_{(k)} + \frac\epsilon{M^2} \mt{I}_{3\times 3}\right)^{-1} \left(\vt{I}_{j} - \vts \mu_{(k)}\right) \right) \right)\right) \alpha_j\\
-    &\triangleq \sum_{j=0}^{HW-1} \sum_{i=0}^{HW-1} \alpha_i L_{i,j} \alpha_j\\
-    &\quad\quad\ \textgrey{\text{where $\mt L$ is the $HW\times HW$ sparse matrix defined in the previous line}}\\
-    &= \vts \alpha^T \mt L\, \vts \alpha
-\end{align*}
-where the notational change from $\delta_{xy}$ to $\delta_{ij}$ is justified because $\delta_{xy} = 1 \iff x=y \iff n_x = n_y \iff i = j\\ \iff \delta_{ij}=1$. \hfill$\square$
-% Observe that each alpha value $\alpha_j$ is involved in $M^2$ such window sums (centred around $M^2$ different window centres).
-
-
-\begin{lemma}\label{lemma3}
-    $\forall i\in\{0,\dots,HW-1\}.\ \mt{\bar{G}}_{(k)}^T \mt{\bar{G}}_{(k)} = \mt{\bar{G}}_{(k)}$
-    \begin{proof}
-        Exactly the same as Lemma \ref{lemma1}, except we syntactically change the proof from using $\mt I_{(M^2+1)\times(M^2+1)}$ to $\mt I_{(M^2+3)\times(M^2+3)}$.
-    \end{proof}
-\end{lemma}
-
-\begin{lemma}\label{lemma4}
-    $\forall k\in\{0,\dots,HW-1\}.\ \forall x,y\in\{0,\dots, M^2-1\}.$
+    $\forall k\in K.\ \forall x,y\in\{0,\dots, M^2-1\}.$
     $$\left({\bar{G}}_{(k)}\right)_{x,y} = \delta_{xy} - \frac1{M^2}\left(1 + \left(\vt{I}_{n_x} - \vts \mu_{(k)}\right)^T \left(\mts \Sigma_{(k)} + \frac\epsilon{M^2} \mt{I}_{3\times 3}\right)^{-1} \left(\vt{I}_{n_y} - \vts \mu_{(k)}\right) \right)$$
-    Note that $\mt{\bar{G}}_{(k)}$ is a $(M^2+3)\times (M^2+3)$ matrix, but we only find the expression of its scalar elements in its upper-left $M^2\times M^2$ submatrix.
+    Note that $\mt{\bar{G}}_{(k)}$ is a $(M^2+3)\times (M^2+3)$ matrix, but we only find the expression of its scalar elements in its upper-left $M^2\times M^2$ submatrix, since where Lemma \ref{lemma2} is used, elements outside this upper-left submatrix are always multiplied by zero and thus irrelevant.
     \begin{proof}
-        For arbitrary $i\in\{0,\dots,HW-1\}$, by definition we have
+        For arbitrary $k \in K$, by definition we have
         $$\mt{\bar{G}}_{(k)} = \mt I_{(M^2+3)\times(M^2+3)} - \mt G_{(k)}\left(\mt G_{(k)}^T \mt G_{(k)} \right)^{-1} \mt G_{(k)}^T.$$
-        Here are two useful auxiliary definitions from the theorem statement:
+        As a reminder, here are two useful definitions from the theorem statement:
         \begin{align*}
-            \vts \mu_{(k)} &= \frac1{M^2} \sum_{m=0}^{M^2-1} \vt I_{n_m} \\
-            &= \bmat{\mu_{(k)R} \\ \mu_{(k)G} \\ \mu_{(k)B}}\\
+            \vts \mu_{(k)} &= \frac1{M^2} \sum_{m=0}^{M^2-1} \vt I_{n_m} = \bmat{\mu_{(k)R} \\ \mu_{(k)G} \\ \mu_{(k)B}}\\
             \mts \Sigma_{(k)} &= \left[\begin{smallmatrix}
                 \frac1{M^2} \sum_{m=0}^{M^2-1} I_{n_m,R}I_{n_m,R} - \mu_{(k)R}\mu_{(k)R} & \frac1{M^2} \sum_{m=0}^{M^2-1} I_{n_m,R}I_{n_m,G} - \mu_{(k)R}\mu_{(k)G} & \frac1{M^2} \sum_{m=0}^{M^2-1} I_{n_m,R}I_{n_m,B} - \mu_{(k)R}\mu_{(k)B}\\
                 \frac1{M^2} \sum_{m=0}^{M^2-1} I_{n_m,G}I_{n_m,R} - \mu_{(k)G}\mu_{(k)R} & \frac1{M^2} \sum_{m=0}^{M^2-1} I_{n_m,G}I_{n_m,G} - \mu_{(k)G}\mu_{(k)G} & \frac1{M^2} \sum_{m=0}^{M^2-1} I_{n_m,G}I_{n_m,B} - \mu_{(k)G}\mu_{(k)B}\\
                 \frac1{M^2} \sum_{m=0}^{M^2-1} I_{n_m,B}I_{n_m,R} - \mu_{(k)B}\mu_{(k)R} & \frac1{M^2} \sum_{m=0}^{M^2-1} I_{n_m,B}I_{n_m,G} - \mu_{(k)B}\mu_{(k)G} & \frac1{M^2} \sum_{m=0}^{M^2-1} I_{n_m,B}I_{n_m,B} - \mu_{(k)B}\mu_{(k)B}
            \end{smallmatrix}\right]
         \end{align*}
-        Here are two useful expressions:
+        Here are two more useful expressions:
         \begin{align*}
             M^2 \vts\mu_{(k)}\vts\mu_{(k)}^T &= \left[\begin{smallmatrix}
                 M^2 \mu_{(k)R}\mu_{(k)R} & M^2 \mu_{(k)R}\mu_{(k)G} & M^2 \mu_{(k)R}\mu_{(k)B} \\
@@ -569,21 +468,22 @@ where the notational change from $\delta_{xy}$ to $\delta_{ij}$ is justified bec
                 \sum_{m=0}^{M^2-1} I_{n_m,R}I_{n_m,R}  & \sum_{m=0}^{M^2-1} I_{n_m,R}I_{n_m,G}  & \sum_{m=0}^{M^2-1} I_{n_m,R}I_{n_m,B} \\
                 \sum_{m=0}^{M^2-1} I_{n_m,G}I_{n_m,R}  & \sum_{m=0}^{M^2-1} I_{n_m,G}I_{n_m,G}  & \sum_{m=0}^{M^2-1} I_{n_m,G}I_{n_m,B} \\
                 \sum_{m=0}^{M^2-1} I_{n_m,B}I_{n_m,R}  & \sum_{m=0}^{M^2-1} I_{n_m,B}I_{n_m,G}  & \sum_{m=0}^{M^2-1} I_{n_m,B}I_{n_m,B}
-           \end{smallmatrix}\right]
+           \end{smallmatrix}\right]\\
+           &= \mt A_{(k)}^T\mt A_{(k)}
         \end{align*}
-
-        To find the $(x,y)$-th element of the matrix $\mt{\bar{G}}_{(k)}$, we consider the expression from inside-out.
+        For arbitrary $x,y\in\{0,\dots, M^2-1\}$, to find the $(x,y)$-th element of the matrix $\mt{\bar{G}}_{(k)}$, we consider its expression from inside-out.
         \begin{align*}
-            \mt G_{(k)}^T \mt G_{(k)} &= \bmat{\mt A_{(k)} & \vt 1_{M^2\times 1} \\ \sqrt\epsilon \mt I_{3\times 3} & \vt 0_{3\times1}}^T  \bmat{\mt A_{(k)} & \vt 1_{M^2\times 1} \\ \sqrt\epsilon \mt I_{3\times 3} & \vt 0_{3\times1}}  \\
+            \mt G_{(k)}^T \mt G_{(k)} &= \bmat{\mt A_{(k)}^T & \sqrt\epsilon \mt I_{3\times 3} \\ \vt 1_{1\times M^2} & \vt 0_{1 \times 3}}  \bmat{\mt A_{(k)} & \vt 1_{M^2\times 1} \\ \sqrt\epsilon \mt I_{3\times 3} & \vt 0_{3\times1}}  \\
             &= \bmat{\mt A_{(k)}^T\mt A_{(k)} + \epsilon\mt I_{3\times 3} & \mt A_{(k)}^T\vt 1_{M^2\times 1} \\ \vt 1_{1\times M^2}\mt A_{(k)}  & \vt 1_{1\times M^2}\vt 1_{M^2\times 1} } \qquad\text{(by \cite[\S9.1.1]{matrix-cookbook})}\\
             &=  M^2 \bmat{\mts \Sigma_{(k)} + \vts\mu_{(k)}\vts\mu_{(k)}^T + \frac\epsilon{M^2}\mt I_{3\times 3}  &  \vts \mu_{(k)} \\  \vts \mu_{(k)}^T & 1  }\\
             &=  M^2 \bmat{
                 \mt B_{(k)} + \vts\mu_{(k)}\vts\mu_{(k)}^T  &  \vts \mu_{(k)} \\
                 \vts \mu_{(k)}^T & 1
             } \\
-            &\quad\quad\ \textgrey{\text{where we define $3\times 3$ matrix $\mt B_{(k)}\triangleq \mts \Sigma_{(k)}+\tfrac\epsilon{M^2}\mt I_{3\times 3}$ for convenience}}
+            &\quad\quad\ \textgrey{\text{where we define $3\times 3$ matrix $\mt B_{(k)}\triangleq \mts \Sigma_{(k)}+\tfrac\epsilon{M^2}\mt I_{3\times 3}$ for convenience}}\\
+            &\quad\quad\ \textgrey{\text{also note that $\mt B_{(k)}$ is symmetric $(\dagger)$}}
         \end{align*}
-        To invert a block matrix, we use \cite[\S9.1.3]{matrix-cookbook}. We define these intermediate matrices from $\mt G_{(k)}^T \mt G_{(k)}$ as in the cookbook:
+        Note that $\mt G_{(k)}^T \mt G_{(k)}$ is symmetric $(\dagger\dagger)$. Next, to invert a block matrix, we use \cite[\S9.1.3]{matrix-cookbook}. We define these intermediate matrices from $\mt G_{(k)}^T \mt G_{(k)}$ as in the cookbook:
         \begin{align*}
             \mt C_1 &= M^2\mt B_{(k)} \cancel{+ M^2\vts\mu_{(k)}\vts\mu_{(k)}^T - M^2\vts\mu_{(k)}\frac1{M^2}M^2\vts\mu_{(k)}^T}\\
             &= M^2 \mt B_{(k)}\\
@@ -611,7 +511,7 @@ where the notational change from $\delta_{xy}$ to $\delta_{ij}$ is justified bec
                 -\frac1{zM^2}\left(\left(\mt B_{(k)} + \vts\mu_{(k)}\vts\mu_{(k)}^T\right)^{-1}\vts\mu_{(k)}\right)^T    & \frac1{zM^2}
             }\\
             &\quad\quad\ \textgrey{\text{the off-diagonal submatrices are transposes of each other since $\mt G_{(k)}^T \mt G_{(k)}$ is symmetric}}\\
-            &\quad\quad\ \textgrey{\text{and the inverse of a symmetric matrix is also symmetric}}\\
+            &\quad\quad\ \textgrey{\text{(from $(\dagger\dagger)$), and the inverse of a symmetric matrix is also symmetric}}\\
             &= \bmat{
                 \frac1{M^2} \mt B_{(k)}^{-1}  & -\frac1{zM^2} \mt B_{(k)}^{-1}\vts\mu_{(k)} \\
                 -\frac1{zM^2}\vts\mu_{(k)}^T \left(\mt B_{(k)}^{-1}\right)^T    & \frac1{z^2M^2}
@@ -621,7 +521,7 @@ where the notational change from $\delta_{xy}$ to $\delta_{ij}$ is justified bec
                 \frac1{M^2} \mt B_{(k)}^{-1}  & -\frac1{M^2} \mt B_{(k)}^{-1}\vts\mu_{(k)} \\
                 -\frac1{M^2}\vts\mu_{(k)}^T \mt B_{(k)}^{-1}   & \frac1{zM^2}
             }\\
-            &\quad\quad\ \textgrey{\text{since $\mt B_{(k)}$ is symmetric and the inverse of a symmetric matrix is also symmetric}}
+            &\quad\quad\ \textgrey{\text{since $\mt B_{(k)}$ is symmetric (from $(\dagger)$), and the inverse of a symmetric matrix is also symmetric}}
         \end{align*}
         We only need to consider the upper-left $M^2\times M^2$ submatrix of the following $(M^2+3)\times (M^2+3)$ matrix, thus the irrelevant submatrices can be crossed out:
         \begin{align*}
@@ -639,9 +539,7 @@ where the notational change from $\delta_{xy}$ to $\delta_{ij}$ is justified bec
             }
             \bmat{\mt A_{(k)}^T & \times \\ \vt 1_{1\times M^2} & \times}
         \end{align*}
-        As a reminder, $\mt A_{(k)} \triangleq \bmat{\vt I_{n_0}^T \\ \vdots \\ \vt I_{n_{M^2-1}}^T}$ is a $M^2\times 3$ matrix, $\mt B_{(k)}$ is a $3 \times 3$ matrix, and $\vts \mu_{(k)}$ is a length-$3$ vector.
-
-        Thus for $x,y\in\{0,\dots,M^2-1\}$:
+        As a reminder, $\mt A_{(k)} \triangleq \left[ \begin{smallmatrix} \vt I_{n_0}^T \\ \vdots \\ \vt I_{n_{M^2-1}}^T \end{smallmatrix} \right]$ is a $M^2\times 3$ matrix, $\mt B_{(k)}$ is a $3 \times 3$ matrix, and $\vts \mu_{(k)}$ is a length-$3$ vector. Thus for arbitrary $x,y\in\{0,\dots,M^2-1\}$:
         \begin{align*}
             \left(\mt G_{(k)} \left(\mt G_{(k)}^T \mt G_{(k)}\right)^{-1} \mt G_{(k)}^T\right)_{x,y}
             &= \bmat{\vt I_{n_x}^T & 1} \bmat{
@@ -661,7 +559,7 @@ where the notational change from $\delta_{xy}$ to $\delta_{ij}$ is justified bec
         We are done:
         \begin{align*}
             \left({\bar{G}}_{(k)}\right)_{x,y} &= \left(\mt I_{(M^2+3)\times(M^2+3)} - \mt G_{(k)} \left(\mt G_{(k)}^T \mt G_{(k)}\right)^{-1} \mt G_{(k)}^T\right)_{x,y} \\
-            &= \delta_{xy} - \frac1{M^2}\left(1 + \left(\vt{I}_{n_x} - \vts \mu_{(k)}\right)^T \left(\mts \Sigma_{(k)} + \frac\epsilon{M^2} \mt{I}_{3\times 3}\right)^{-1} \left(\vt{I}_{n_y} - \vts \mu_{(k)}\right) \right)
+            &= \delta_{xy} - \frac1{M^2}\left(1 + \left(\vt{I}_{n_x} - \vts \mu_{(k)}\right)^T \left(\mts \Sigma_{(k)} + \frac\epsilon{M^2} \mt{I}_{3\times 3}\right)^{-1} \left(\vt{I}_{n_y} - \vts \mu_{(k)}\right) \right).
         \end{align*}
     \end{proof}
 \end{lemma}
