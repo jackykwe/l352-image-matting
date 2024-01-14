@@ -5,7 +5,9 @@ import scipy.ndimage as spndimage
 from scipy import linalg as splinalg
 from tqdm.auto import tqdm
 
-from . import explicit, updownsampling, utils
+import utils
+
+from . import explicit, updownsampling
 
 
 def get_linear_coefficients(alpha, I, epsilon, window_size, *, debug_levels_count):

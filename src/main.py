@@ -6,8 +6,8 @@ import scipy.ndimage as spndimage
 import skimage
 
 import closedform.coarsetofine
-import closedform.utils
 import robust.entry
+import utils
 
 # python3 src/main.py -v closedform -i datasets/input_training_lowres/GT01.png -s datasets/input_training_lowres/GT01-scribble.png -l 4 -L 2
 # python3 src/main.py -v closedform -i datasets/input_training_lowres/GT02.png -s datasets/input_training_lowres/GT02-scribble.png -l 4 -L 2
@@ -63,18 +63,18 @@ if __name__ == "__main__":
     if args.subcommand == "closedform":
         logging.info(f"Opening {args.image_path}")
         I = skimage.io.imread(args.image_path) / 255
-        I = closedform.utils.ensure_3d_image(I)  # H x W x C array
+        I = utils.ensure_3d_image(I)  # H x W x C array
 
         logging.info(f"Opening {args.scribble_path}")
         I_scribble = skimage.io.imread(args.scribble_path) / 255 # this is mI in MATLAB code
         assert I_scribble.shape[:2] == I.shape[:2], f"Shapes of scribble image ({I_scribble.shape[:2]}) and image ({I.shape[:2]}) don't match"
-        I_scribble_gray2D = closedform.utils.matlab_compatible_rgb2gray(I_scribble) if len(I_scribble.shape) == 3 else I_scribble  # H x W array
+        I_scribble_gray2D = utils.matlab_compatible_rgb2gray(I_scribble) if len(I_scribble.shape) == 3 else I_scribble  # H x W array
         if args.trimap_mode:
             constrained_map = np.isclose(I_scribble_gray2D, 0, atol=1e-3) | np.isclose(I_scribble_gray2D, 1, atol=1e-3)
             constrained_map = spndimage.binary_erosion(constrained_map, np.ones((1 + 2 * args.trimap_erosion_window_size, 1 + 2
             * args.trimap_erosion_window_size))).astype(float)
         else:
-            I_scribble = closedform.utils.ensure_3d_image(I_scribble)  # H x W x C array
+            I_scribble = utils.ensure_3d_image(I_scribble)  # H x W x C array
             constrained_map = (np.sum(np.absolute(I - I_scribble), axis=2) > 1e-3).astype(float)  # this is consts_map in MATLAB; H x W array
         constrained_vals = I_scribble_gray2D * constrained_map  # NB. * is the element-wise multiply operator; H x W array
 
@@ -91,12 +91,12 @@ if __name__ == "__main__":
     elif args.subcommand == "robust":
         logging.info(f"Opening {args.image_path}")
         I = skimage.io.imread(args.image_path) / 255
-        I = closedform.utils.ensure_3d_image(I)  # H x W x C array
+        I = utils.ensure_3d_image(I)  # H x W x C array
 
         logging.info(f"Opening {args.trimap_path}")
         I_trimap = skimage.io.imread(args.trimap_path) / 255 # this is mI in MATLAB code
         assert I_trimap.shape[:2] == I.shape[:2], f"Shapes of trimap image ({I_trimap.shape[:2]}) and image ({I.shape[:2]}) don't match"
-        I_trimap_gray2D = closedform.utils.matlab_compatible_rgb2gray(I_trimap) if len(I_trimap.shape) == 3 else I_trimap  # H x W array
+        I_trimap_gray2D = utils.matlab_compatible_rgb2gray(I_trimap) if len(I_trimap.shape) == 3 else I_trimap  # H x W array
 
         foreground_map = np.absolute(I_trimap_gray2D - 1) < 1e-3  # H x W bool array
         background_map = np.absolute(I_trimap_gray2D) < 1e-3  # H x W bool array

@@ -8,8 +8,9 @@ import scipy.sparse as spsparse
 import scipy.sparse.linalg as spsparselinalg
 from tqdm.auto import tqdm
 
+import utils
+
 from . import sampling
-from .utils import DIVISION_EPSILON
 
 # from . import slowmetrics  # for debugging only
 
@@ -274,16 +275,16 @@ def solve_alpha(
         # Names now in 2D world (what we are familiar with)
         cT_minus_FiT = cT - FiT  # foreground_samples_count x C float array
         cT_minus_FiT_squared = np.sum(cT_minus_FiT * cT_minus_FiT, axis=1)  # 1D length-foreground_samples_count float array
-        penalty_foreground_exparg = -cT_minus_FiT_squared / (np.min(cT_minus_FiT_squared) + DIVISION_EPSILON)  # this is dividing by D_F^2;  # 1D length-foreground_samples_count float array
+        penalty_foreground_exparg = -cT_minus_FiT_squared / (np.min(cT_minus_FiT_squared) + utils.DIVISION_EPSILON)  # this is dividing by D_F^2;  # 1D length-foreground_samples_count float array
         cT_minus_BjT = cT - BjT   # background_samples_count x C float array
         cT_minus_BjT_squared = np.sum(cT_minus_BjT * cT_minus_BjT, axis=1)  # 1D length-background_samples_count float array
-        penalty_background_exparg = -cT_minus_BjT_squared / (np.min(cT_minus_BjT_squared) + DIVISION_EPSILON)  # this is dividing by D_B^2;  # 1D length-background_samples_count float array
+        penalty_background_exparg = -cT_minus_BjT_squared / (np.min(cT_minus_BjT_squared) + utils.DIVISION_EPSILON)  # this is dividing by D_B^2;  # 1D length-background_samples_count float array
         penalty_foreground_background = np.exp(np.repeat(penalty_foreground_exparg, background_samples_count) + np.tile(penalty_background_exparg, foreground_samples_count))  # 1D length-(foreground_samples_count * background_samples_count) float array
 
         # Names now in 3D
         Fi_minus_Bj_3D = (np.repeat(FiT, background_samples_count, axis=0) - np.tile(BjT, (foreground_samples_count, 1)))[:, :, np.newaxis]  # (foreground_samples_count * background_samples_count) x C x 1 float array
         FiT_minus_BjT_3D = np.transpose(Fi_minus_Bj_3D, (0, 2, 1))  # (foreground_samples_count * background_samples_count) x 1 x C float array
-        Fi_minus_Bj_squared_3D = FiT_minus_BjT_3D @ Fi_minus_Bj_3D + DIVISION_EPSILON # (foreground_samples_count * background_samples_count) x 1 x 1 float array
+        Fi_minus_Bj_squared_3D = FiT_minus_BjT_3D @ Fi_minus_Bj_3D + utils.DIVISION_EPSILON # (foreground_samples_count * background_samples_count) x 1 x 1 float array
         alpha_premultiplier_3D = FiT_minus_BjT_3D / Fi_minus_Bj_squared_3D  # this subexpression is named, as it's useful again later when estimating alphas (see estimated_alphas variable);  (foreground_samples_count * background_samples_count) x 1 x C float array
         Aij_3D = \
             (
