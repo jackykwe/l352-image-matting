@@ -203,15 +203,15 @@ def solve_alpha(
         foreground_map,
         background_map,
         unknown_map,
-        foreground_samples_count=20,
-        background_samples_count=20,
-        sampling_method="deterministic_spread",
-        nearest_candidates_count=200,
-        sigma_squared=0.01,
-        highest_confidence_pairs_to_select=3,
-        epsilon=1e-5,
-        gamma=0.1,
-        window_size=1
+        foreground_samples_count,
+        background_samples_count,
+        sampling_method,
+        nearest_candidates_count,
+        sigma_squared,
+        highest_confidence_pairs_to_select,
+        epsilon,
+        gamma,
+        window_size
     ):
     """
     `I`: H x W x C float array
@@ -237,7 +237,7 @@ def solve_alpha(
     estimated_alphas = np.zeros((unknown_count, highest_confidence_pairs_to_select), dtype=float)  # row-major traversal of unknown pixels;  unknown_count x highest_confidence_pairs_to_select float array
     estimated_confidences_exparg = np.zeros((unknown_count, highest_confidence_pairs_to_select), dtype=float)  # row-major traversal of unknown pixels;  unknown_count x highest_confidence_pairs_to_select float array
 
-    if sampling_method in ("local_random", "deterministic_spread_local"):
+    if sampling_method in ("local_random", "local_spread"):
         scheme_config = {"name": sampling_method, "nearest_candidates_count": nearest_candidates_count}
     else:
         scheme_config = {"name": sampling_method}

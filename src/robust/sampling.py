@@ -121,17 +121,17 @@ def get_samples(
     - `{"name": "global_random_same"}`
     - `{"name": "global_random"}`
     - `{"name": "local_random", "nearest_candidates_count": int}`
-    - `{"name": "deterministic"}`
-    - `{"name": "deterministic_spread_global"}`
-    - `{"name": "deterministic_spread_local", "nearest_candidates_count": int}`
+    - `{"name": "nearest"}`
+    - `{"name": "global_spread"}`
+    - `{"name": "local_spread", "nearest_candidates_count": int}`
 
     For an unknown pixel at coordinates `unknown_ij, the schemes behave differently:
     - `global_random_same`: sample `foreground_samples_count` pixels randomly from all foreground boundary pixels; likewise for background. all unknown pixels use the same samples.
     - `global_random`: same as `global_random_same` but resampling is performed for each unknown pixel.
     - `local_random`: sample `foreground_samples_count` pixels randomly from the nearest `nearest_candidates_count` foreground boundary pixels; likewise for background. resampling is performed for each unknown pixel.
-    - `deterministic`: sample the nearest `foreground_samples_count` foreground boundary pixels; likewise for background. resampling is performed for each unknown pixel.
-    - `deterministic_spread_global`: same as `deterministic`, but the samples are evenly spread across image, like the circles in Figure 5(b). resampling is performed for each unknown pixel.
-    - `deterministic_spread_local`: same as `deterministic_spread_global`, but the samples are evenly spread across the nearest `nearest_candidates_count` fore/background pixels, like the circles in Figure 5(b). resampling is performed for each unknown pixel. This is the default scheme.
+    - `nearest`: sample the nearest `foreground_samples_count` foreground boundary pixels; likewise for background. resampling is performed for each unknown pixel.
+    - `global_spread`: same as `nearest`, but the samples are evenly spread across image, like the circles in Figure 5(b). resampling is performed for each unknown pixel.
+    - `local_spread`: same as `global_spread`, but the samples are evenly spread across the nearest `nearest_candidates_count` fore/background pixels, like the circles in Figure 5(b). resampling is performed for each unknown pixel. This is the default scheme.
 
     Returns:
     ```
@@ -176,7 +176,7 @@ def get_samples(
             background_samples_count,
             replace=False
         )
-    elif scheme_config["name"] == "deterministic":
+    elif scheme_config["name"] == "nearest":
         # choice between euclidean_distances/manhattan_distances/chebyshev_distances
         # chose Manhattan distances, gives same ranking as Euclidean but cheaper
         foreground_boundary_distances, background_boundary_distances = manhattan_distances(
@@ -189,7 +189,7 @@ def get_samples(
         )
         foreground_choices = np.argsort(foreground_boundary_distances)[:foreground_samples_count]
         background_choices = np.argsort(background_boundary_distances)[:background_samples_count]
-    elif scheme_config["name"] == "deterministic_spread_global":
+    elif scheme_config["name"] == "global_spread":
         # choice between euclidean_distances/manhattan_distances/chebyshev_distances
         # chose Manhattan distances, gives same ranking as Euclidean but cheaper
         foreground_boundary_distances, background_boundary_distances = manhattan_distances(
@@ -204,7 +204,7 @@ def get_samples(
         background_interval = len(background_boundary_distances) // background_samples_count
         foreground_choices = np.argsort(foreground_boundary_distances)[::foreground_interval][:foreground_samples_count]
         background_choices = np.argsort(background_boundary_distances)[::background_interval][:background_samples_count]
-    elif scheme_config["name"] == "deterministic_spread_local":
+    elif scheme_config["name"] == "local_spread":
         nearest_candidates_count = scheme_config["nearest_candidates_count"]
         # choice between euclidean_distances/manhattan_distances/chebyshev_distances
         # chose Manhattan distances, gives same ranking as Euclidean but cheaper

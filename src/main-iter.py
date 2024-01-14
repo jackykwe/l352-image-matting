@@ -95,7 +95,6 @@ if __name__ == "__main__":
         print(f"[{scheme_tag}] {image_path} took {time_taken} ns")
         with open(timings_file_path, "a") as f:
             f.write(f"{image_name},{time_taken}\n")
-        break
 
     #####################################
     # LOWRES Robust: Global Random Same #
@@ -104,18 +103,18 @@ if __name__ == "__main__":
         "global_random_same",
         "global_random",
         "local_random",
-        "deterministic",
-        "deterministic_spread_global",
-        "deterministic_spread_local"
+        "nearest",
+        "global_spread",
+        "local_spread"
     ):
-        if sampling_method in ("local_random", "deterministic_spread_local"):
+        if sampling_method in ("local_random", "local_spread"):
             # These methods use nearest_candidates_count
             nearest_candidates_counts = (50, 100, 200, 500, 1000)
         else:
             # The rest don't
             nearest_candidates_counts = (200,)
         for nearest_candidates_count in nearest_candidates_counts:
-            if sampling_method not in ("local_random", "deterministic_spread_local"):
+            if sampling_method not in ("local_random", "local_spread"):
                 scheme_tag = f"lowres-robust-{sampling_method}"
                 output_dir = os.path.join(OUTPUT_ROOTDIR, scheme_tag)
                 os.makedirs(output_dir, exist_ok=True)
@@ -186,6 +185,3 @@ if __name__ == "__main__":
                 print(f"[{scheme_tag}] {image_path} took {time_taken} ns")
                 with open(timings_file_path, "a") as f:
                     f.write(f"{image_name},{time_taken}\n")
-                break
-            break
-        break
