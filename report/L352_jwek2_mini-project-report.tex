@@ -14,6 +14,32 @@
 \usepackage{amsthm}         % Theorems & QED
 %\usepackage{ifthen}         % Conditional processing in tex
 \usepackage{parskip}
+\usepackage{float}
+\usepackage{amsmath} % for the \DeclareMathOperator macro
+\allowdisplaybreaks % From amsmath: allows align to span pages
+\usepackage{centernot}
+\usepackage{mathtools} % for small matrices
+\newcommand{\bmat}[1]{\begin{bmatrix}#1\end{bmatrix}}
+\usepackage{cancel}
+\usepackage{amsthm}
+\theoremstyle{definition}
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\DeclareMathAlphabet{\mathbbb}{U}{bbold}{m}{n}  % for things like \mathbb{1} to work, courtesy of https://tex.stackexchange.com/a/601142
+\usepackage{cmap} % allow ff / fi ligatures to be searchable
+\usepackage{enumitem} % For custom enumerate
+%\usepackage[hidelinks]{hyperref} % Conflicted with new SV template
+\usepackage[nottoc]{tocbibind} % Adds References to TOC. Though recommended, note that this command can mess up certain things (e.g. fancyhf in fancyhdr, among other things mentioned at https://www.overleaf.com/learn/latex/Bibliography_management_with_bibtex#Adding_the_bibliography_in_the_table_of_contents)
+\usepackage{cite} % compress long lists of citations like [1, 2, 3, 4] into [1--4]. Courtesy of https://tex.stackexchange.com/a/15114
+\usepackage{graphicx}
+\usepackage{graphbox}  % adds [align=c] option to includegraphics, courtesy of https://tex.stackexchange.com/a/350374
+\usepackage{multirow}
+\usepackage{xcolor}
+\usepackage[T1]{fontenc} % what's this for? https://tex.stackexchange.com/questions/664/why-should-i-use-usepackaget1fontenc
+\usepackage{lmodern} % fixes pixelation
+\newcommand{\textgrey}[1]{\textcolor{gray}{#1}}
+\DeclareMathOperator*{\argmin}{argmin}
+\usepackage{mathrsfs}
 % Boilerplate for appendix TOC courtesy of https://tex.stackexchange.com/a/419290
 \usepackage{minitoc}
 \renewcommand \thepart{}
@@ -23,10 +49,6 @@
 \def\vts#1{\underline{\boldsymbol{#1}}}
 \def\mt#1{\underline{\underline{\mathbf{#1}}}}
 \def\mts#1{\underline{\underline{\boldsymbol{#1}}}}
-
-% Pull in the template, configured as above.
-\input{/home/jacky/Documents/part-ii/courses/Work/templates/shared_template.tex}
-%\input{/home/jacky/Documents/part-ii/courses/Work/templates/notes_template.tex}
 
 % Courtesy of https://tex.stackexchange.com/a/106719
 \usepackage{stmaryrd}
@@ -220,6 +242,11 @@ $\displaystyle W_{i,j} = \sum_{\substack{k\in K:\\i\in w_{(k)}\\\wedge j\in w_{(
 \end{figure}
 The $\delta_{ij}$ terms are handled by constructing a $HW\times HW$ diagonal matrix $\mt D$ whose entries are $D_{i,i} = \sum_{j=0}^{HW-1} W_{i,j}$, and $\mt L$ is finally given by $\mt L = \mt D - \mt W$. Proof of this method's correctness is provided in Appendix~\ref{appendix:w-sum-zero-proof}.
 
+\paragraph{Optimisation overview}
+The Lagrangian optimisation has a closed form solution
+$$(\mt L + \lambda \mt D_S) \hat{\vts \alpha} = \lambda \mt D_S \vt b_S$$
+which is computed via Cholesky decomposition with the \verb|sksparse.cholmod| library.
+
 \paragraph{Coarse-to-fine computation of $\hat{\vts\alpha}$.} Computation of the full-size Laplacian may still take tens of seconds for large images. For efficiency, the implementation constructs a four-layer Gaussian pyramid. Computation of Laplacians and Lagrangian optimisation (to obtain downsampled $\hat{\vts\alpha}$) are performed only for the coarser two layers. Each time we move to the next finer layer, alpha values within $0.02$ of $0$ or $1$ are clipped to $0$ and $1$ respectively. The coarser $\hat{\vts\alpha}$ is used to compute the $\vt a_k^T, b_k$ terms in the colour line model equation $\alpha_k = \vt a_k^T \vt I_k + b_k$. These terms are then upsampled via linear interpolation, and the right-hand side of the same equation evaluated to obtain a finer $\hat{\vts\alpha}$. We defer details to the original paper, which showed that this procedure is efficient and produces a final $\hat{\vts\alpha}$ that is very similar to solving the full-size Laplacian directly \cite[\S4]{closed-form-matting}.
 % constrain a pixel iff all pixels in its window are also constrained. For these centres, no need to enforce linear colour model,
 %     # so we omit summing them. Remember the alphaT L alpha term is there to enforce the smoothness/linear colour models.
@@ -259,17 +286,6 @@ The original paper suggests spreading out the foreground and background boundary
     \label{fig:sampling}
 \end{figure}
 
-5 METHODS. EVALUATE.
-
-
-
-
-
-JUST OUTLINE THEM. SUSPECT WHICH WORKS BEST. THEN EVALUATE TO CONFIRM.
-EVALUATION: PSNR AND RUNTIMES FOR ALL 5 METHODS PLUS  CLOSED FORM PLUS AEMATTER. yay.
-
-
-
 \paragraph{Optimisation overview.} Let $\#K$ and $\#U$ be the number of pixels in the original image with known and unknown alpha values respectively. We define length-$\#U$ vectors $\vt W^{(F)}, \vt W^{(B)}$ whose elements are defined as
 \begin{align*}
     W^{(F)}_k &= \gamma\cdot\left(\hat f_k \hat{\alpha}_k + (1-\hat f_k) \mathbbb{1}_{\hat{\alpha}_k > 0.5} \right)\\
@@ -305,6 +321,37 @@ The Python code provided by the authors is used as is, with minor modifications 
 
 %PSNR equivalent to MSE. (supervisor)
 %MSE within unknown area
+
+Jesus christ this table is hard to insert
+% \begin{table}[H]
+%     \centering
+%     \resizebox{\columnwidth}{!}{%
+%     \begin{tabular}{@{}llccc@{}}
+%     \toprule
+%     \multicolumn{2}{c}{\textbf{Algorithm}} & \textbf{SAE} & \textbf{MSE} & \textbf{Time Taken [s]} \\ \midrule
+%     \multirow{14}{*}{Robust} & \texttt{global_spread} & 10325k & 2665 & 56.5 \\
+%      & \texttt{global_random_same} & 10038k & 2615 & 38.5 \\
+%      & \texttt{global_random} & 10159k & 2564 & 41.3 \\
+%      & \texttt{local_spread (nearest 1000)} & 9112k & 2209 & 56.6 \\
+%      & \texttt{local_random (nearest 1000)} & 9017k & 2157 & 63.1 \\
+%      & \texttt{local_spread (nearest 500)} & 8275k & 1967 & 56.6 \\
+%      & \texttt{local_random (nearest 500)} & 8233k & 1935 & 61.7 \\
+%      & \texttt{local_spread (nearest 200)} & 7019k & 1615 & 56.4 \\
+%      & \texttt{local_random (nearest 200)} & 6966k & 1588 & 61.1 \\
+%      & \texttt{local_spread (nearest 100)} & 6094k & 1360 & 56.2 \\
+%      & \texttt{local_random (nearest 100)} & 6065k & 1345 & 60.9 \\
+%      & \texttt{local_random (nearest 50)} & 5390k & 1201 & 60.7 \\
+%      & \texttt{local_spread (nearest 50)} & 5188k & 1169 & 56.1 \\
+%      & \texttt{nearest} & 4768k & 1113 & 55.9 \\
+%     \multicolumn{2}{l}{Closed-form} & 1949k & 450.2 & 3.47 \\
+%     \multicolumn{2}{l}{AEMatter} & \textbf{611k} & \textbf{52.66} & 1.51 \\ \bottomrule
+%     \end{tabular}%
+%     }
+%     \caption{}
+%     \label{tbl:statistics-table}
+% \end{table}
+
+
 
 Closed form: Input is trimap so the \verb|-T| parameter.
 All of them: SPEED. VS H VS W VS NUMBER OF UNKNOWN PIXELS VS PCT OF UNKNOWN PIXELS
