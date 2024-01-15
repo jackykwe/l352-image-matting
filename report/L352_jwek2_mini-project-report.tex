@@ -61,8 +61,8 @@
 %\setcounter{section}{-1}
 
 \usepackage{multicol}
-\title{\vspace{-3em} Image matting}
-\author{Jacky~W.E.~Kung}
+\title{\vspace{-3em} Python Re-implementation of Classical Image Matting Algorithms}
+\author{Jacky~W.~E.~Kung \and Hongyun~Gao (Supervisor)}
 \date{15 January 2024}
 
 \setlength{\columnsep}{0.5cm}
@@ -74,7 +74,7 @@
 
 \maketitle
 \begin{abstract}
-    Image matting is a well-understood problem, and there exists closed-form solutions. However, as the problem is fundamentally underdetermined, there is no single ``correct'' solution, and thus algorithms in literature have considerable flexibility in defining what a ``best'' solution is and how to obtain it. This work reimplements one sampling-based and one propagation-based classical matting algorithm, and discusses code optimisation strategies. A detailed mathematical treatment of the underlying concepts is consolidated and presented. Quantitative and qualitative comparisons with today's state of the art deep learning algorithm are presented. The mathematical notation adopted in this work is outlined in Appendix~\ref{appendix:notation}.
+    Image matting is a well-understood problem, and there exists closed-form solutions. However, as the problem is fundamentally underdetermined, there is no single ``correct'' solution, and thus algorithms in literature have considerable flexibility in defining what a ``best'' solution is and how to obtain it. This work re-implements one sampling-based and one propagation-based classical matting algorithm, and discusses code optimisation strategies. A detailed mathematical treatment of the underlying concepts is consolidated and presented. Quantitative and qualitative comparisons with today's state-of-the-art deep learning algorithm are presented. The mathematical notation adopted in this work is outlined in Appendix~\ref{appendix:notation}.
     % \textbf{ ANY QUANTITATIVE RESULTS TO REPORT? DO THEY MATCH THE ORIGINAL?  potential robust matting skill issue.. }
 \end{abstract}
 \begin{multicols}{2}[]
@@ -96,14 +96,15 @@
 
 %• Forget what you thought an overview was
 %- I hate “In section we introduce blah, in section 2....)
+\emph{The explicit definition of mathematical symbols used throughout this report can be found in Appendices~\ref{appendix:theorem-1} and \ref{appendix:theorem-1-statement}.}
 
 The process of matting an image involves separating foreground objects from the background. Formally, the matting equation is defined at each pixel $k$ of the image $\mt I$ by $$\vt I_k = \alpha_{k} \vt F_{k}  + (1-\alpha_k) \vt B_k$$
-where $\alpha_{k}\in[0,1]$, and $\mt F, \mt B$ are the unknown ``foreground'' and ``background'' images. Explicit definition of mathematical symbols are in Appendix~\ref{appendix:theorem-1-statement}.   The alpha mask is fractional to allow smooth handling of fine details such as hairs, and also for motion blurring \cite{bayesian-matting}. The image matting problem is then to estimate $\vts \alpha, \mt F, \mt B$ using $\mt I$ and additional information from a user. This can take the form of \emph{trimaps}, in which the user annotates pixel regions that are definitely foreground, definitely background, and ambiguous.  The traditional green/blue screen technique works, but we are interested in matting for general images that do not have a monochrome background.
+where $\alpha_{k}\in[0,1]$, and $\mt F, \mt B$ are the unknown ``foreground'' and ``background'' images.   %The alpha mask is fractional to allow smooth handling of fine details such as hairs, and also for motion blurring \cite{bayesian-matting}.
+The image matting problem is then to estimate $\vts \alpha, \mt F, \mt B$ using $\mt I$ and additional information from a user. These are typically \emph{trimaps}, in which the user annotates pixel regions that are known to be foreground or background, and those that are \emph{unknown}.  %The traditional green/blue screen technique works, but we are interested in matting for general images that do not have a monochrome background.
 
-To the best of my knowledge, only a third-party \verb|C++| implementation \cite{web:robust-cpp-github} exists for Robust Matting \cite{robust-matting}, and it cannot be compiled in 2024 due to outdated dependencies.  This work reimplements both Robust Matting and Closed-form Matting \cite{closed-form-matting} in Python. While there exists a Python implementation for the latter \cite{web:closed-form-python-github}, reimplementation without referring to it was done to obtain a deeper understanding of its mathematical foundations, which are also necessary for understanding Robust Matting. Furthermore, this work presents an evaluation of various sampling strategies for Robust Matting, which was left out in the original paper. Finally, a brief performance comparison with today's state of the art deep neural network (DNN) algorithm is performed.
+This work re-implements both Closed-form Matting \cite{closed-form-matting} and Robust Matting \cite{robust-matting} in Python. While there exists a Python implementation for the former \cite{web:closed-form-python-github}, re-implementation was done without referring to it to obtain a deep understanding of its mathematical foundations, which are also necessary for understanding Robust Matting. The authors' MATLAB implementation was referred to heavily, as there are many important details expressed not in the original paper but only through their code, which hindered blind re-implementation. For Robust Matting, to the best of our knowledge, only a third-party \verb|C++| implementation exists on the public domain \cite{web:robust-cpp-github}, and it cannot be compiled due to outdated dependencies. Blind re-implementation of Robust Matting was performed with minimal reference to the \verb|C++| code (used only for debugging and verification).
 
-
-
+We also design and evaluate various sampling strategies for Robust Matting, which was omitted in the original paper. Finally, we briefly compare the implementations against today's state-of-the-art deep neural network (DNN) algorithm.
 
 %“Although the problem is severely ill-posed, the strong correlations between nearby image pixels can be leveraged to alleviate the difficulties.” ([Wang and Cohen, 2007, p. 1](zotero://select/library/items/82ECWWKJ)) ([pdf](zotero://open-pdf/library/items/H4SBS9AI?page=1))
 
@@ -115,13 +116,13 @@ To the best of my knowledge, only a third-party \verb|C++| implementation \cite{
 \section{Related Work}
 % \emph{The "Related work" section should review 2-4 relevant papers, compare and contrast the proposed work to what has been published before.}
 
-Classical matting algorithms are split into two classes. \emph{Sampling-based} methods first estimate $\vt F_k$ and $\vt B_k$ by sampling known foreground and background pixels marked by a provided trimap, then solve for $\alpha_k$ \cite{dim-paper}. Bayesian Matting solves for the maximum a posteriori (MAP) estimate for $\vts \alpha,\mt F,\mt B$ simultaneously \cite{bayesian-matting}. Robust Matting computes a confidence measure for foreground-background sample pairs, and chooses those with the highest confidence as the samples. This work focuses on Robust Matting as it is newer and better performant than Bayesian Matting. \emph{Propagation-based} methods transfer information about known alphas from annotated foreground and background regions into the unknown ambiguous regions \cite{dim-paper}. Poisson Matting solves a Poisson equation using a desired alpha gradient field \cite{poisson-matting}. Closed-form Matting produces $\vts \alpha$ by solving of a system of sparse linear equations, and is a seminal piece of work influencing many later algorithms. Again, this work focuses on Closed-form matting as it is newer and better than Poisson matting. Newer matting algorithms exist for both classes \cite{closed-form-survey}, but are outside the scope of this work.  %\cite{closed-form-matting} is the newest and most superior of these four techniques, and
+Classical matting algorithms are split into two classes. \emph{Sampling-based} methods first estimate $\vt F_k$ and $\vt B_k$ by sampling known foreground and background pixels for each unknown pixel $k$, then solve for $\alpha_k$ \cite{dim-paper}. Bayesian Matting solves for the maximum a posteriori estimate for $\vts \alpha,\mt F,\mt B$ simultaneously \cite{bayesian-matting}. Robust Matting computes a confidence measure for foreground-background sample pairs, then chooses only high confidence pairs. \emph{Propagation-based} methods transfer information about known alphas from known regions into unknown regions \cite{dim-paper}. Poisson Matting solves a Poisson equation involving a desired alpha gradient field \cite{poisson-matting}. Closed-form Matting produces $\vts \alpha$ by solving a system of sparse linear equations, and is a seminal piece of work influencing many algorithms that come after it. We focus on Closed-form Matting and Robust Matting as they are more recent and performant than Bayesian and Poisson Matting respectively. While newer matting algorithms exist for both classes \cite{closed-form-survey}, they are outside the scope of this work. %\cite{closed-form-matting} is the newest and most superior of these four techniques, and
 
-State of the art approaches today involve DNNs. The best performing algorithm on the \emph{Composition-1K} dataset at time of writing is \emph{AEMatter}, according to \emph{PapersWithCode}. As its authors explain, DNNs supersede classical algorithms with their ability to capture and represent complicated high-level context (e.g.\ common patterns in hairs), significantly improving the quality of mattes produced \cite{sota-composition-1k}. We compare the chosen classical algorithms with AEMatter in the evaluation section (\S\ref{evaluation}).
+State-of-the-art approaches today involve DNNs. The best performing algorithm on the \emph{Composition-1K} dataset at time of writing is \emph{AEMatter}, according to \emph{Papers With Code} \cite{web:papers-with-code}. As the authors explain, DNNs supersede classical algorithms due to their ability to capture and represent complicated high-level context, which significantly improves the quality of output mattes \cite{sota-composition-1k}.
 
 % The proposed plan of this project is to:
 % \begin{enumerate}[label=\arabic*.]
-%     \item Re-implement, adapting code wherever possible, \textbf{Closed-Form Matting} (propagation-based) and \textbf{Optimised Colour Sampling} (sampling-based). If time permits (pending discussion of final project scope with supervisor), the other two mentioned classical methods may be implemented too. The aim is to achieve deep understanding of these classical methods.
+%     \item Re-implement, adapting code wherever possible, \textbf{Closed-form Matting} (propagation-based) and \textbf{Optimised Colour Sampling} (sampling-based). If time permits (pending discussion of final project scope with supervisor), the other two mentioned classical methods may be implemented too. The aim is to achieve deep understanding of these classical methods.
 %     \item Compare the results between these two classes of methods:
 %     \begin{itemize}
 %         \item (Qualitative) The four papers provided in the synopsis \cite{bayesian-matting, robust-matting, poisson-matting, closed-form-matting} rely mainly on qualitative evaluation on a small number of ``problematic'' images. These would be sourced from more recent literature.
@@ -179,7 +180,7 @@ State of the art approaches today involve DNNs. The best performing algorithm on
 %     %“where a mixture of oriented Gaussians is used to learn the local distribution and then , F , and B are estimated as the most probable ones given that distribution. Such methods work well when the color distributions of the foreground and the background do not overlap, and the unknown region in the trimap is small.” ([Levin et al., 2008, p. 229](zotero://select/library/items/TDAQSBJL)) ([pdf](zotero://open-pdf/library/items/ISLA8TYD?page=2))
 % \end{itemize}
 % \begin{itemize}
-%     \item Closed-Form Matting 2006: a propagation method. Doesn't \emph{necessarily} use trimaps. Argues trimaps are a limitation, and user interaction to refine trimap shouldn't be needed. Uses just a SPARSE set of scribbles from user since reliable estimates for F and B images are not required for this method. \textbf{CODE AVAILABLE. But it's in Objective-C...}
+%     \item Closed-form Matting 2006: a propagation method. Doesn't \emph{necessarily} use trimaps. Argues trimaps are a limitation, and user interaction to refine trimap shouldn't be needed. Uses just a SPARSE set of scribbles from user since reliable estimates for F and B images are not required for this method. \textbf{CODE AVAILABLE. But it's in Objective-C...}
 
 %     Can be seen as a smoothness refinement technique: \emph{``Smoothness refinement method is a straightforward idea that first utilizes sampling-based strategy to estimate the alpha matte and then refines the alpha matte using affinity-based strategy.''}
 %     %“This is typically done by iterative nonlinear optimization, alternating the estimation of F and B with that of alpha. In practice, this means that for good results, the unknown regions in the trimap must be as small as possible. As a consequence, trimap-based approaches typically experience difficulty handling images with a significant portion of mixed pixels or when the foreground object has many holes [19].” ([Levin et al., 2008, p. 228](zotero://select/library/items/TDAQSBJL)) ([pdf](zotero://open-pdf/library/items/ISLA8TYD?page=1))
@@ -196,13 +197,12 @@ State of the art approaches today involve DNNs. The best performing algorithm on
 
 %For initial iteration, crop a small part of the image. Only for final testing use full images!!
 
-This Before implementing the two algorithms, I sought a deep understanding of their mathematical foundations. I will present some of the useful insights here, along with how they affect the code implementation.
+We present key mathematical insights and how they affect the re-implementations in this section.
 
 \subsection{Closed-form Matting}\label{s3-closed-form-matting}
-The Python implementation was written by consulting the MATLAB implementation provided by the authors, as there are many crucial details expressed not in the original paper but only through their code. I present the important ones here.
 
 For coloured images with height $H$ and width $W$, %Closed-form Matting assumes the \emph{colour line model}, which states that within any local window of an image, all foreground pixels can be expressed as a linear combination of two colours, and likewise for background pixels. This allows us to predict the alpha value of a pixel $\alpha_{k}$ linearly from the pixel value $\vt I_{k}$ as $\alpha_k = \vt a_k^T \vt I_k + b_k$ for some vector $\vt a_k^T$ and scalar $b_k$.
-Theorem 1 \cite{closed-form-matting} defines the loss of a predicted alpha image $\vts \alpha$ as $ J(\vts \alpha) = \vts \alpha^T \mt L\, \vts \alpha$ where $\vts \alpha$ is a length-$HW$ vector, and $\mt L$ is a $HW\times HW$ sparse \emph{matting Laplacian} matrix with entries defined below. A full derivation, not present in literature to be best of my knowledge, is presented in Appendix~\ref{appendix:theorem-1}.
+Theorem 1 \cite{closed-form-matting} defines the loss of a predicted alpha image $\vts \alpha$ as $ J(\vts \alpha) = \vts \alpha^T \mt L\, \vts \alpha$ where $\vts \alpha$ is a length-$HW$ vector, and $\mt L$ is a $HW\times HW$ sparse \emph{matting Laplacian} matrix with elements defined below. A full derivation, not present in literature to be best of our knowledge, is presented in Appendix~\ref{appendix:theorem-1}.
 % \begin{center}
 %     \resizebox{0.65\columnwidth}{!}{%
 %     $\begin{aligned}[t]
@@ -213,16 +213,16 @@ Theorem 1 \cite{closed-form-matting} defines the loss of a predicted alpha image
 %     \end{center}
 
 \resizebox{\columnwidth}{!}{%
-$\displaystyle L_{i,j} = \sum_{\substack{k\in K:\\i\in w_{(k)}\\\wedge j\in w_{(k)}}} \left( \delta_{ij} - \underbracket{\frac1{M^2}\left(1 + \left(\vt{I}_i - \vts \mu_{(k)}\right)^T \left(\mts \Sigma_{(k)} + \frac\epsilon{M^2} \mt{I}_{3\times 3}\right)^{-1} \left(\vt{I}_j - \vts \mu_{(k)}\right) \right)}_{(*)} \right). $
+$\displaystyle L_{i,j} = \sum_{\substack{k\in K:\\i\in w_{(k)}\\\wedge j\in w_{(k)}}} \left( \delta_{ij} - \underbracket{\frac1{M^2}\left(1 + \left(\vt{I}_i - \vts \mu_{(k)}\right)^T \left(\mts \Sigma_{(k)} + \frac\epsilon{M^2} \mt{I}_{3\times 3}\right)^{-1} \left(\vt{I}_j - \vts \mu_{(k)}\right) \right)}_{(*)} \right)$
 }
 
-Even for low resolution images of size $600 \times 400$, $\mt L$ is a $240\text{k} \times 240\text{k}$ matrix, which contains $\SI{5.76e10}{}$ cells. Thankfully, sparse matrix libraries such as \verb|scipy.sparse| exist to alleviate space usage, and runtime can be significantly sped up by skipping over unnecessary sums.
+Even for low resolution images of size $600 \times 400$, $\mt L$ is a $240\text{k} \times 240\text{k}$ matrix, which contains $\SI{5.76e10}{}$ cells. Thankfully, the use of sparse matrix libraries such as \verb|scipy.sparse| alleviates space usage, and by skipping over unnecessary sums, the execution time can be significantly sped up.
 
-\paragraph{Skipping $k$s when computing $\mt L$.} To see this, the closed-form solution $\hat{\vts\alpha}$ is found via Lagrangian optimisation as
+\paragraph{Skipping $k$s when computing $\mt L$.} The closed-form solution $\hat{\vts\alpha}$ is found via the Lagrangian optimisation
 $$\hat{\vts \alpha} = \argmin_{\vts\alpha} \left( J(\vts\alpha) + \lambda \left(\vts\alpha - \vt b_S\right)^T\mt D_S \left(\vts\alpha - \vt b_S\right) \right)$$
-where $\mt D_S$ is a $HW\times HW$ diagonal matrix whose element is 1 if that pixel is known (to be foreground or background) and 0 otherwise, $\vt b_S$ is a length-$HW$ vector containing the known alpha values (1 for foreground, 0 for background and unknown), and $\lambda=100$ is a large Lagrangian multiplier to enforce the known alpha values. $J(\vts\alpha)$ thus predominantly only influences the unknown alpha values in $\hat{\vts\alpha}$. When computing $\mt L$ as part of $J(\vts\alpha)$, we may thus skip summing over centres $k$ where all pixels have known mattes, as such computation has imperceptible effect on the final $\hat{\vts \alpha}$.
+where $\mt D_S$ is a $HW\times HW$ diagonal matrix whose elements are 1 if the corresponding pixel is known (foreground or background) and 0 otherwise, $\vt b_S$ is a length-$HW$ vector containing the known alpha values (1 for foreground, 0 for background and unknown), and $\lambda=100$ is a large Lagrangian multiplier to enforce the known alpha values. $J(\vts\alpha)$ thus predominantly only influences the unknown alpha values in $\hat{\vts\alpha}$. When computing $\mt L$ as part of $J(\vts\alpha)$, we may thus skip summing over centres $k$ where all pixels have known mattes, as their numerical contribution is overshadowed by the large $\lambda$ in the optimisation equation, and thus have imperceptible effect on the final $\hat{\vts \alpha}$.
 
-\textbf{Computation of $\mt L$.} A triple for-loop iterating over all $i,j$ and then considering applicable centres $k\in K$ performs many repeated computations. The code instead iterates over all window centres $k\in K$, and computes the summand $(*)$ for all $M^4$ possible pixel pairs in the window, then adds them to the corresponding $M^4$ elements of a $HW\times HW$ sparse matrix $\mt W$ as illustrated by Figure~\ref{fig:index-displacement}. $\mt W$ is defined as
+\textbf{Computation of $\mt L$.} Iterating over all $i,j$ and then considering which window centres $k\in K$ are applicable will result in many repeated computations. The code instead iterates over \emph{all} window centres, and computes the underbracketed summand $(*)$ for all $M^4$ possible pixel pairs in the window ($M=3$ is the window width), then adds them to the corresponding $M^4$ elements of a $HW\times HW$ sparse matrix $\mt W$ as illustrated by Figure~\ref{fig:index-displacement}. The elements of $\mt W$ are
 \resizebox{\columnwidth}{!}{%
 $\displaystyle W_{i,j} = \sum_{\substack{k\in K:\\i\in w_{(k)}\\\wedge j\in w_{(k)}}} \frac1{M^2}\left(1 + \left(\vt{I}_i - \vts \mu_{(k)}\right)^T \left(\mts \Sigma_{(k)} + \frac\epsilon{M^2} \mt{I}_{3\times 3}\right)^{-1} \left(\vt{I}_j - \vts \mu_{(k)}\right) \right). $
 }
@@ -235,20 +235,24 @@ $\displaystyle W_{i,j} = \sum_{\substack{k\in K:\\i\in w_{(k)}\\\wedge j\in w_{(
 
 % . Its values
 
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=\linewidth]{index-displacement}
-    \caption{Left: Computation of $\mt L$ involves iterating over all possible window centres $k\in K$ (within the red box). Right: Values in $\mt W$ incremented during iteration $k=W+1$.}
-    \label{fig:index-displacement}
-\end{figure}
-The $\delta_{ij}$ terms are handled by constructing a $HW\times HW$ diagonal matrix $\mt D$ whose entries are $D_{i,i} = \sum_{j=0}^{HW-1} W_{i,j}$, and $\mt L$ is finally given by $\mt L = \mt D - \mt W$. Proof of this method's correctness is provided in Appendix~\ref{appendix:w-sum-zero-proof}.
+The $\delta_{ij}$ terms are handled by constructing a $HW\times HW$ diagonal matrix $\mt D$ whose elements are $D_{i,i} = \sum_{j=0}^{HW-1} W_{i,j}$, and $\mt L$ is finally given by $\mt L = \mt D - \mt W$. A proof of correctness can be found in Appendix~\ref{appendix:w-sum-zero-proof}.
 
-\paragraph{Optimisation overview}
+\paragraph{Optimisation overview.}
 The Lagrangian optimisation has a closed form solution
-$$(\mt L + \lambda \mt D_S) \hat{\vts \alpha} = \lambda \mt D_S \vt b_S$$
+$$\left(\mt L + \lambda \mt D_S\right) \hat{\vts \alpha} = \lambda \mt D_S \vt b_S$$
 which is computed via Cholesky decomposition with the \verb|sksparse.cholmod| library.
 
-\paragraph{Coarse-to-fine computation of $\hat{\vts\alpha}$.} Computation of the full-size Laplacian may still take tens of seconds for large images. For efficiency, the implementation constructs a four-layer Gaussian pyramid. Computation of Laplacians and Lagrangian optimisation (to obtain downsampled $\hat{\vts\alpha}$) are performed only for the coarser two layers. Each time we move to the next finer layer, alpha values within $0.02$ of $0$ or $1$ are clipped to $0$ and $1$ respectively. The coarser $\hat{\vts\alpha}$ is used to compute the $\vt a_k^T, b_k$ terms in the colour line model equation $\alpha_k = \vt a_k^T \vt I_k + b_k$. These terms are then upsampled via linear interpolation, and the right-hand side of the same equation evaluated to obtain a finer $\hat{\vts\alpha}$. We defer details to the original paper, which showed that this procedure is efficient and produces a final $\hat{\vts\alpha}$ that is very similar to solving the full-size Laplacian directly \cite[\S4]{closed-form-matting}.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\columnwidth]{index-displacement}
+    \caption{Left: Computation of $\mt L$ involves iterating over all possible valid window centres in the set $K$ (the red box). Right: Values in $\mt W$ incremented during iteration $k=W+1$ are marked with \texttt{+}.}
+    \label{fig:index-displacement}
+\end{figure}
+
+
+
+
+\paragraph{Coarse-to-fine computation of $\hat{\vts\alpha}$.} Computation of the full-size Laplacian may still take tens of seconds for large images. For efficiency, the implementation constructs a four-layer Gaussian pyramid. Computation of $\mt L$ and Lagrangian optimisation (to obtain coarse $\hat{\vts\alpha}$) are performed only for the coarser two layers. Each time we move to the next finer layer, alpha values within $0.02$ of $0$ or $1$ are clipped to $0$ and $1$ respectively. The coarser $\hat{\vts\alpha}$ image is used to compute the $\vt a_k^T, b_k$ terms in the colour line model equation $\hat\alpha_k = \vt a_k^T \vt I_k + b_k$. These terms are then upsampled via linear interpolation, and the right-hand side of the same equation evaluated to obtain a finer $\hat{\vts\alpha}$. We refer details to the original paper, which showed that this procedure is efficient and produces a final $\hat{\vts\alpha}$ that is very similar to solving the full-size Laplacian directly \cite[\S4]{closed-form-matting}.
 % constrain a pixel iff all pixels in its window are also constrained. For these centres, no need to enforce linear colour model,
 %     # so we omit summing them. Remember the alphaT L alpha term is there to enforce the smoothness/linear colour models.
 %     # I believe for these centres, the linear model is trivially satisfied and so no loss.
@@ -258,12 +262,13 @@ which is computed via Cholesky decomposition with the \verb|sksparse.cholmod| li
 
 
 \subsection{Robust Matting}
-The Python impelmentation was written with minimal reference (only referring to \cite{web:robust-cpp-github} for debugging). Robust Matting proceeds in two phases: sampling and optimisation.
+% The Python impelmentation was written with minimal reference (only referring to \cite{web:robust-cpp-github} for debugging).
+Robust Matting proceeds in two phases: sampling and optimisation.
 
-\paragraph{Sampling overview.} Using a provided trimap, we binary-dilate the unknown regions using a simple $3\times 3$ ones kernel. Intersecting this with the foreground and background regions produces the foreground and background boundaries respectively. For each unknown pixel with pixel value $\vt I_k$, 20 foreground boundary and 20 background boundary pixels $\{\vt F_i\}_{i=0}^{19}, \{\vt B_j\}_{j=0}^{19}$ are sampled. For each of the 400 possible foreground-background sample pairs $(\vt F_i, \vt B_j)$, an alpha estimate $\alpha_{i,j} = \frac{\left(\vt F_i - \vt B_j\right)^T\left(\vt I_k - \vt B_j\right)}{\left(\vt F_i - \vt B_j\right)^T\left(\vt F_i - \vt B_j\right)}$ is computed using the projection of $\vt I_k$ onto the line through $\vt F_i$ and $\vt B_j$, and a confidence metric $f(\vt F_i, \vt B_j; \vt I_k)$ assigned. The top three highest confidence values and alphas are retained and averaged to form the initial confidence and alpha estimates $\hat f_k$ and $\hat{\alpha}_k$ respectively.
+\paragraph{Sampling overview.} Using a provided trimap, we binary-dilate the unknown regions using a simple $3\times 3$ ones kernel. Intersecting this with the foreground and background regions yields the foreground and background boundaries respectively. For each unknown pixel with colour $\vt I_k$, 20 foreground boundary and 20 background boundary pixels $\{\vt F_i\}_{i=0}^{19}, \{\vt B_j\}_{j=0}^{19}$ are sampled. We discuss sampling strategies later. For each of the 400 possible foreground-background sample pairs $(\vt F_i, \vt B_j)$, an alpha estimate $\alpha_{i,j} = \frac{\left(\vt F_i - \vt B_j\right)^T\left(\vt I_k - \vt B_j\right)}{\left(\vt F_i - \vt B_j\right)^T\left(\vt F_i - \vt B_j\right)}$ is computed using the projection of $\vt I_k$ onto the line through $\vt F_i$ and $\vt B_j$, and a confidence metric $f(\vt F_i, \vt B_j; \vt I_k)$ assigned. The top three confidence values and the corresponding alphas are retained and averaged to form the confidence estimate $\hat f_k$ and alpha estimate $\hat{\alpha}_k$.
 
 \paragraph{Computation of confidences.}
-The mathematical form of $f(\vt F_i, \vt B_j; \vt I_k)$ presented here is equivalent to the one in original paper, but this form allows for common-subexpression elimination optimisations in my implementation.
+The mathematical form of $f(\vt F_i, \vt B_j; \vt I_k)$ presented here is equivalent to the one in original paper, but allows for many common-subexpression eliminations in the re-implementation.
 
 \resizebox{\columnwidth}{!}{%
 $\begin{aligned}[t]
@@ -274,36 +279,46 @@ $\begin{aligned}[t]
 \end{aligned}$
 }
 
-Together with appropriate use of 3D \verb|numpy| arrays, this reduces the runtime complexity of the sampling stage from quadratic-like to linear-like with respect to the total number of unknown pixels (observed via local testing). For a test $800\times 500$ image, the sampling runtime was reduced from $\approx\SI{2.5}{\minute}$ to $\approx\SI{30}{\second}$, which is a significant speedup. Proof of correctness is provided in Appendix~\ref{appendix:robust-confidence}.
+Together with appropriate use of 3D \verb|numpy| arrays, this reduces the runtime complexity of the sampling stage from quadratic-like to linear-like (see Figure~\ref{fig:t-against-U}) with respect to the total number of unknown pixels. For a test $800\times 500$ image, the sampling execution time was reduced from $\approx\SI{2.5}{\minute}$ to $\approx\SI{30}{\second}$, which is significant. A proof of correctness can be found in Appendix~\ref{appendix:robust-confidence}.
 
 
 
-\paragraph{Sampling strategies.}
-The original paper suggests spreading out the foreground and background boundary samples, but leaves concrete details out. In this work, we implement six different sampling schemes. \verb|global_random| samples randomly from all boundary pixels; \verb|local_random| samples randomly from nearby boundary pixels; \verb|nearest| samples the nearest boundary pixels; \verb|global_spread| evenly spreads out the samples throughout all boundary pixels; \verb|local_spread| evenly spreads out samples throughout nearby boundary pixels. \verb|global_random_same| is similar to \verb|global_random| but all unknown pixels use the same samples. These are illustrated in Figure~\ref{fig:sampling}. Spreading is performed by ranking the candidate boundary pixels by proximity, then evenly sampling across the ranks.
+\paragraph{Sampling strategies.}\label{robust-sampling}
+The original paper suggests spreading out the foreground and background boundary samples, but leaves concrete details out. In this work, we implement six different sampling schemes, illustrated in Figure~\ref{fig:sampling}. For each unknown pixel, \verb|global_random| samples randomly from all boundary pixels, \verb|local_random| samples randomly from nearby boundary pixels, \verb|nearest| samples the nearest boundary pixels, \verb|global_spread| evenly spreads out the samples throughout all boundary pixels, and \verb|local_spread| evenly spreads out samples throughout nearby boundary pixels. \verb|global_random_same| is \verb|global_random| but all unknown pixels use the same samples. Spreading is performed by  sorting and ranking the candidate boundary pixels (either all or nearby only) by spatial proximity to the unknown pixel, then evenly sampling across the ranks. If there are 200 candidates, we take ranks $[1, 11, 21, \dots, 191]$; if there are 1000 candidates, we take ranks $[1, 51, 101,\dots,951]$.
 
-We suspect that \verb|local_spread| would perform best as the samples are both localised and spread out, which retains relevance of samples to the unknown pixel while increasing the probability of finding a good pair. Technically, a brute force search between all possible pairs using the full foreground and background boundaries would find the best possible pair given the image and trimap, but it is computationally too expensive.
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.7\linewidth]{sampling}
-    \caption{The six implemented Robust Matting sampling strategies. $F,B,U$ represent foreground, background and unknown regions. The unknown pixel for which sampling is done is in orange, and the samples are in blue.}
-    \label{fig:sampling}
-\end{figure}
+We hypothesise that \verb|local_spread| would perform best, as the spatial locality retains the samples' relevance to the unknown pixel, and  the spatial variance increases the probability of finding a good foreground-background boundary sample pair when evaluating $f(\vt F_i, \vt B_j; \vt I_k)$. Technically, brute forcing through all possible boundary pairs in the image would guarantee finding the best possible pair given the image and trimap, but it is computationally too expensive to be a workable approach.
 
-\paragraph{Optimisation overview.} Let $\#K$ and $\#U$ be the number of pixels in the original image with known and unknown alpha values respectively. We define length-$\#U$ vectors $\vt W^{(F)}, \vt W^{(B)}$ whose elements are defined as
-\begin{align*}
+
+\paragraph{Optimisation overview.} Let $\#K$ and $\#U$ be the number of pixels with known and unknown alpha values respectively. We define length-$\#U$ vectors $\vt W^{(F)}, \vt W^{(B)}$ whose elements are defined as
+
+\begin{center}
+\resizebox{0.72\columnwidth}{!}{%
+$\begin{aligned}
     W^{(F)}_k &= \gamma\cdot\left(\hat f_k \hat{\alpha}_k + (1-\hat f_k) \mathbbb{1}_{\hat{\alpha}_k > 0.5} \right)\\
     W^{(B)}_k &= \gamma\cdot\left(\hat f_k \left(1-\hat{\alpha}_k\right) + (1-\hat f_k) \mathbbb{1}_{\hat{\alpha}_k \leq 0.5} \right)
-\end{align*}
-where $\mathbbb1_\text{predicate}$ is 1 if the predicate is true and 0 otherwise. The $(HW+2)\times(HW+2)$ matting Laplacian is then constructed as
+\end{aligned}$
+}
+\end{center}
+
+where $\mathbbb1_\text{predicate}$ is 1 if the predicate is true and 0 otherwise. The $(HW+2)\times(HW+2)$ matting Laplacian $\mt L$ is then constructed as
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{sampling}
+    \caption{The six implemented Robust Matting sampling strategies. $F,B,U$ represent foreground (known), background (known) and unknown regions. Orange: the unknown pixel for which sampling is done. Blue: the boundary samples.}
+    \label{fig:sampling}
+\end{figure}
 $$\mt L = \left[\begin{smallmatrix}
     \times & \times & \times & \left(\vt W^{(F)}\right)^T \\
     \times & \times & \times & \left(\vt W^{(B)}\right)^T \\
     \times & \times & \mt L^{(1)} & \mt R \\
     \vt W^{(F)} & \vt W^{(B)} & \mt R^T & \mt L^{(u)}
 \end{smallmatrix}\right]$$
-where the first two rows and columns represent the virtual nodes $\Omega_F,\Omega_B$ mentioned in the paper \cite[\S4.3]{robust-matting}, $\mt L^{(1)}$ is a $\#K \times \#K$ matrix, and irrelevant submatrices are crossed out. The submatrix $\left[\begin{smallmatrix}\mt L^{(1)} & \mt R \\ \mt R^T & \mt L^{(u)}\end{smallmatrix}\right]$ is exactly the Laplacian we constructed for Closed-form Matting, except we reorder rows and columns such that when we index each axis from $0,\dots,HW-1$, all the known pixels come first, followed by all the unknown pixels. Importantly, this Laplacian has all the properties discussed in Section \ref{s3-closed-form-matting}. In particular each diagonal element is the negative sum of the rest of the row (since $\mt L = \mt D - \mt W$), therefore we must subtract from $L^{(u)}_{i,i}$ the sum of $W^{(F)}_i$ and $W^{(B)}_j$, which is $\gamma=0.1$. The unknown alpha values $\vt A_u$ in $\hat{\vts \alpha}$ is then found via Conjugate Gradient:
+
+where the first two rows and columns represent the virtual nodes $\Omega_F,\Omega_B$ mentioned in the paper \cite[\S4.3]{robust-matting}, $\mt L^{(1)}$ is a $\#K \times \#K$ matrix, and irrelevant submatrices are crossed out. The $HW\times HW$ submatrix $\left[\begin{smallmatrix}\mt L^{(1)} & \mt R \\ \mt R^T & \mt L^{(u)}\end{smallmatrix}\right]$ is exactly the Laplacian constructed for Closed-form Matting, except with rows and columns reordered such that when we index each axis from $0,\dots,HW-1$, all the known pixels come first, followed by all the unknown pixels. This $\mt L$ has all the properties discussed in Section \ref{s3-closed-form-matting}. In particular, each diagonal element is the negative sum of the rest of the row (since $\mt L = \mt D - \mt W$), therefore we must subtract from $L^{(u)}_{i,i}$ the sum of $W^{(F)}_i$ and $W^{(B)}_i$, which is $\gamma=0.1$. The unknown alpha values $\vt A_u$ in $\hat{\vts \alpha}$ is then found via the Conjugate Gradient method:
 $$\mt L_u \vt A_u = -\mt R^T \vt A_k$$
-where $\vt A_k$ is a length $(2+\# K)$ vector containing 1s for foreground pixels and 0s for background pixels.
+where $\vt A_k$ is a length-$(2+\# K)$ vector containing 1s for foreground pixels and 0s for background pixels.
+
 
 \subsection{AEMatter}
 The Python code provided by the authors is used as is, with only minor modifications to enable usage on \emph{Google Colab}. Execution requires a CUDA-enabled GPU.
@@ -325,26 +340,23 @@ The Python code provided by the authors is used as is, with only minor modificat
 %PSNR equivalent to MSE. (supervisor)
 %MSE within unknown area
 
-\subsection{Dataset and Methodology}
-The evaluation dataset is obtained from the \emph{AlphaMatting} website \cite{alpha-matting-dot-com}. It contains 27 low-resolution images, and comes with the ground truth alpha image, as well as a coarser trimap and a finer trimap. While finer trimaps yield better results \cite{robust-matting}, this work uses only the coarser trimaps as they better match the quality of trimaps end-users would be able to produce in realistic scenarios.
-
-Each matting algorithm (Closed-Form, Robust and its variants, and AEMatter) is given the 27 images in turn, and the final alpha images are saved and compared with the ground truth. For the \verb|local_random| and \verb|local_spread| variants of Robust Matting, a range of nearby thresholds $\in\{50,100,200,500,1000\}$ are evaluated (from which 20 foreground/background pixels are sampled).
+The evaluation dataset is obtained from the \emph{Alpha Matting Evaluation Website} \cite{alpha-matting-dot-com}. We use the low resolution images and coarse trimaps, which yield poorer results than fine trimaps \cite{robust-matting}, but more realistically reflect the quality of trimaps end-users would provide. For each algorithm (Closed-form, Robust variants, and AEMatter), the produced alpha images are compared with the dataset's ground truths. For the \verb|local_random| and \verb|local_spread| variants of Robust Matting, multiple ``nearby boundary'' (see \S\ref{robust-sampling}) sizes $\in\{50,100,200,500,1000\}$ are evaluated.
 \subsection{Quantitative Results}
-The results for each matting algorithm is shown in Table~\ref{tbl:statistics-table}. As expected, the state of the art deep learning approach significantly outperforms the classical approaches. Surprisingly, all variants of Robust Matting implemented by this work significantly underperforms Closed-form Matting, despite the original paper claiming superiority over Closed-form Matting. One possible explanation may be that sampling-based methods are generally inferior to propagation-based methods: Closed-form Matting solves a fully-deterministic sparse linear system, while Robust Matting obtains optimal samples only by chance. Another explanation may be implementation errors on my part. Mathematical errors are unlikely as I have verified the mathematical equivalence of my code with the third-party implementation \cite{web:robust-cpp-github}. The poor performance may be attributed to the sampling phase of the code.
+Table~\ref{tbl:statistics-table} summarises the quantitative results. The state-of-the-art AEMatter expectedly outshines the classical approaches. Surprisingly, all variants of Robust Matting in our re-implementation significantly underperforms Closed-form Matting, despite the original paper claiming superiority over Closed-form Matting. One plausible explanation may be that sampling-based methods are generally inferior to propagation-based methods: Closed-form Matting solves a fully-deterministic sparse linear system, while Robust Matting obtains optimal samples only by chance. Another plausible explanation may be re-implementation errors. Optimisation-phase errors are unlikely as we verified the mathematical equivalence of our re-implementation with the third-party implementation \cite{web:robust-cpp-github}. Sampling-phase errors are more likely.
 
-It is also surprising that the \verb|nearest| variant performed the best, as the original paper explained that such a sampling strategy is precisely the limiting factor of older sampling-based algorithms. As the original authors did not release a reference implementation, there is no direct way to verify the claims in their paper.
+Among the Robust variants, it is also surprising that \verb|nearest| performed the best, as the original paper specifically emphasised this sampling strategy as the limiting factor of older sampling-based algorithms, and should perform worst. As the original authors did not release a reference implementation, we are unable to verify this.
 
-The classical algorithms are executed on a Intel Core i7 CPU at $\SI{1.80}{\giga\hertz}$, and AEMatter is executed on a NVIDIA Tesla T4 GPU. The run times of each algorithm as a function of $\#U$ is illustrated in Figure~\ref{fig:t-against-U}. In general, the run time of AEMatter and Closed-Form do not depend on $\#U$. They are also much faster than the sampling-based Robust algorithm which takes about a minute per iamge. The \verb|global_random| and \verb|global_random_same| variants of Robust Matting are slightly quicker as they do not involve sorting the boundary pixels by proximity to each unknown pixel.
+Figure~\ref{fig:t-against-U} plots the execution times as a function of $\#U$. The classical algorithms are executed on an Intel Core i7 $\SI{1.80}{\giga\hertz}$ CPU, and AEMatter is executed on a NVIDIA Tesla T4 GPU. The execution time of the Robust variants depends somewhat linearly on $\#U$, while those of Closed-form and AEMatter do not vary with $\#U$. The sampling-based Robust algorithm also takes much longer, up to almost $\SI{3}{\minute}$ depending on the image. The bottleneck is the sampling phase, which performs expensive computation for each unknown pixel. The \verb|global_random| and \verb|global_random_same| variants of Robust Matting are slightly quicker as they do not involve sorting all boundary pixels by spatial proximity to the each iteration's unknown pixel.
 
 \subsection{Qualitative Results}
-We look more closely at the output of the \verb|local_spread| (nearest 50) variant of Robust Matting. Its performance is the worst for image \verb|GT26.png|, shown in Figure~\ref{fig:qualitative}. Robust Matting suffers from severe ``haloing'' in majority of the trimap-marked unknown regions. The trimaps produced by the other two algorithms are much cleaner. However, Robust Matting tends to preserve thin foreground structures better than Closed-form Matting, as circled in green and red.
+Figure~\ref{fig:qualitative} shows the worst-performing image for the \verb|local_spread| (nearest 50) variant of Robust Matting. Our Robust Matting re-implementation produces alphas that exhibit severe ``haloing'' where the trimap marked as unknown, unlike the much cleaner alphas produced by the other two algorithms. However, Robust Matting tends to preserve thin foreground structures better than Closed-form Matting, as circled.
 
 \begin{table}[H]
     \centering
-    \resizebox{\columnwidth}{!}{%
+    \resizebox{0.88\columnwidth}{!}{%
     \begin{tabular}{@{}llccc@{}}
     \toprule
-    \multicolumn{2}{c}{\textbf{Algorithm}} & \textbf{SAE} & \textbf{MSE} & \textbf{Time Taken [s]} \\ \midrule
+    \multicolumn{2}{c}{\textbf{Algorithm}} & \textbf{SAE} & \textbf{MSE}$\downarrow$ & \textbf{Execution time [s]} \\ \midrule
     \multirow{14}{*}{Robust} & \texttt{global\_spread} & 10325k & 2665 & 56.5 \\
      & \texttt{global\_random\_same} & 10038k & 2615 & 38.5 \\
      & \texttt{global\_random} & 10159k & 2564 & 41.3 \\
@@ -363,21 +375,21 @@ We look more closely at the output of the \verb|local_spread| (nearest 50) varia
     \multicolumn{2}{l}{AEMatter} & \textbf{611k} & \textbf{52.66} & \textbf{1.51} \\ \bottomrule
     \end{tabular}%
     }
-    \caption{Metrics for each algorithm, averaged across the 27 evaluation images. The rows are sorted in descending order of MSE. For all metrics, lower is better. SAE is expressed to nearest thousand, MSE to 4 significant figures and time to 3 significant figures.}
+    \caption{Metrics for each algorithm, averaged across the 27 evaluation images. The rows are sorted in descending order of MSE. For all metrics, lower is better.}
     \label{tbl:statistics-table}
 \end{table}
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=\linewidth]{t-against-U}
-    \caption{}
+    \includegraphics[width=0.88\columnwidth]{t-against-U}
+    \caption{Plot of the 27 execution times against $\#U$.}
     \label{fig:t-against-U}
 \end{figure}
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=\linewidth]{qualitative}
-    \caption{Comparison of \texttt{GT26.png} in the evaluation dataset.}
+    \includegraphics[width=0.88\columnwidth]{qualitative}
+    \caption{Comparison for \texttt{GT26.png}. Top: from the evaluation dataset. Bottom: output alpha images.}
     \label{fig:qualitative}
 \end{figure}
 
@@ -387,9 +399,7 @@ We look more closely at the output of the \verb|local_spread| (nearest 50) varia
 %Future work: Don't: Why would you discuss your future research?
 %• Only useful as a discussion of current limitations.
 
-This work presents an efficient and effective implementation of Closed-form Matting. Attempts at implementing Robust Matting were semi-effective, and the output alpha images do not perform up to the promises of the original paper. We suspect that Robust Matting works really well in practice: there could be caveats omitted from the paper for commercialisation purposes. We also present an implementation and evaluation of six different sampling strategies, and showed that sampling the nearest boundary known pixels led to the best performance.
-
-Investigatation of the surprisingly poor performance of Robust Matting is the primary future direction for this work. Its execution time could also be improved: the bottleneck is the sampling phase, which performs expensive computation for each unknown pixel in the trimap.
+Our re-implementation of Closed-form Matting is efficient and effective, but that of Robust Matting falls short of the promises of the original paper. We suspect that Robust Matting works really well in practice: there could be caveats omitted from the paper for commercialisation purposes. We also showed that, out of the six sampling strategies, sampling from the nearest boundary pixels led to the best performance Future work could investigate the surprisingly poor performance of Robust Matting. Its execution time could also be improved.
 
 
 \end{multicols}
@@ -406,7 +416,7 @@ Investigatation of the surprisingly poor performance of Robust Matting is the pr
 
 \newpage
 \section{Mathematical notation}\label{appendix:notation}
-The (perhaps usual) notational standard of denoting scalars as unbolded, vectors as lowercase bolded and matrices as uppercase bolded does not work for the subfield of image matting, as capitalisation is freely intermixed for scalar, vector and matrix quantities. For clarity, I adopt the following notation for this report, which mimics how I'd handwrite vectors and matrices:
+The (perhaps usual) notational standard of denoting scalars as unbolded, vectors as lowercase bolded and matrices as uppercase bolded does not work for the subfield of image matting, as capitalisation is freely intermixed for scalar, vector and matrix quantities. For clarity, I adopt the following notation for this report, which mimics how I handwrite vectors and matrices:
 \begin{itemize}
     \item Scalars are unbolded (e.g.\ $k$).
     \item Vectors are bolded and underlined once, and their scalar elements referred to as
@@ -421,8 +431,8 @@ The (perhaps usual) notational standard of denoting scalars as unbolded, vectors
         I_{m-1,0} & I_{m-1,1} & \cdots & I_{m-1,n-1} \\
     }$$
     for a $m\times n$ matrix $\mt I$ whose rows are $\{\vt r_0^T, \dots, \vt r_{m-1}^T\}$, columns are $\{\vt c_0, \dots, \vt c_{n-1}\}$, and elements are\\$\{I_{0,0}, \dots, I_{m-1,n-1}\}$.
-    \item Identity matrices, one-vectors and zero-vectors are subscripted with their size (Eg.\ $\mt I_{3\times 3}$ is a $3\times 3$ identity matrix, $\vt{1}_{1\times 3}$ is a length-$3$ row one-vector, and $\vt{0}_{3\times 1}$ is a length-$3$ column zero-vector.)
-    \item Subscripts are by default used to index elements of a vector or matrix, as shown above. Where subscripts are required to \emph{parametrise (i.e.\ express a different version of)} a vector/matrix instead, I bracket them, such as $w_{(k)}, \vts \mu_{(k)}, \mt G_{(k)}$.
+    \item Identity matrices, one-vectors and zero-vectors are subscripted with their shape (Eg.\ $\mt I_{3\times 3}$ is a $3\times 3$ identity matrix, $\vt{1}_{1\times 3}$ is a length-$3$ row one-vector, and $\vt{0}_{3\times 1}$ is a length-$3$ column zero-vector.)
+    \item Subscripts are by default used to index elements of a vector or matrix, as shown above. Where subscripts are required to \emph{parametrise (i.e.\ express a different version of)} a vector/matrix instead, I bracket them, such as $\vts \mu_{(k)}, \mt G_{(k)}$.
 \end{itemize}
 
 \newpage
@@ -671,7 +681,7 @@ where the notational change from $\delta_{xy}$ to $\delta_{ij}$ is justified bec
 From Section~\ref{s3-closed-form-matting}, we define the matrix $\mt W$ as
 $$ W_{i,j} = \sum_{\substack{k\in K:\\i\in w_{(k)}\\\wedge j\in w_{(k)}}} \frac1{M^2}\left(1 + \left(\vt{I}_i - \vts \mu_{(k)}\right)^T \left(\mts \Sigma_{(k)} + \frac\epsilon{M^2} \mt{I}_{3\times 3}\right)^{-1} \left(\vt{I}_j - \vts \mu_{(k)}\right) \right). $$
 
-The matting Laplacian $\mt L$ has entries defined as
+The matting Laplacian $\mt L$ has elements defined as
 \begin{align*}
     L_{i,j} &= \sum_{\substack{k\in K:\\i\in w_{(k)}\\ \wedge j\in w_{(k)}}} \left( \delta_{ij} - \frac1{M^2}\left(1 + \left(\vt{I}_i - \vts \mu_{(k)}\right)^T \left(\mts \Sigma_{(k)} + \frac\epsilon{M^2} \mt{I}_{3\times 3}\right)^{-1} \left(\vt{I}_j - \vts
 \mu_{(k)}\right) \right) \right) \\
@@ -681,9 +691,9 @@ The matting Laplacian $\mt L$ has entries defined as
 \end{align*}
 Define a diagonal $HW\times HW$ matrix $\mt D$ with elements $D_{i,i} = \sum_{j=0}^{HW-1} W_{i,j}$. We now prove that $\mt L = \mt D - \mt W$.
 
-Consider an fixed row $i$ in $\mt L$. For off-diagonal entries in this row (when $j\neq i$), the above expression reduces to $L_{i,j} = -W_{i,j}$. Thus we have
+Consider an fixed row $i$ in $\mt L$. For off-diagonal elements in this row (when $j\neq i$), the above expression reduces to $L_{i,j} = -W_{i,j}$. Thus we have
 $$\sum_{j\neq i} L_{i,j} = -\sum_{j\neq i} W_{i,j}$$
-For diagonal entries in this row, we note that the sum across every row of $\mt L$ is zero (by Lemma~\ref{lemma3}). Therefore:
+For diagonal elements in this row, we note that the sum across every row of $\mt L$ is zero (by Lemma~\ref{lemma3}). Therefore:
 \begin{align*}
     \sum_{j=0}^{HW-1} L_{i,j} &= 0\\
     L_{i,i} + \sum_{j\neq i} L_{i,j} &= 0\\
@@ -745,7 +755,7 @@ Here we proof the correctness of the above expression for $f(\vt F_i, \vt B_j; \
     \right)\right)
 \end{align*}
 
-We defer to the original paper \cite{robust-matting} for explanations of each component in this expression. For this appendix, we thus need to show that
+We refer to the original paper \cite{robust-matting} for explanations of each component in this expression. For this appendix, we thus need to show that
 \begin{align*}
     \frac{\left\| \vt I_k - \left( \alpha_{i,j}\vt F_i + (1-\alpha_{i,j})\vt B_j\right)  \right\|^2}{\left\| \vt F_i - \vt B_j \right\|^2} &= \left(\vt I_k - \vt B_j \right)^T          \left( \frac{\mt I_{3\times 3} -  \frac{\left(\vt F_i - \vt B_j\right)\left(\vt F_i - \vt B_j\right)^T}{\left(\vt F_i - \vt B_j\right)^T\left(\vt F_i - \vt B_j\right)}}{\left(\vt F_i - \vt B_j\right)^T\left(\vt F_i - \vt B_j\right)}\right)     \left(\vt I_k - \vt B_j \right)  \\
     \text{i.e.\ }\quad\left\| \vt I_k - \left( \alpha_{i,j}\vt F_i + (1-\alpha_{i,j})\vt B_j\right)  \right\|^2 &= \left(\vt I_k - \vt B_j \right)^T          \left( \mt I_{3\times 3} -  \frac{\left(\vt F_i - \vt B_j\right)\left(\vt F_i - \vt B_j\right)^T}{\left(\vt F_i - \vt B_j\right)^T\left(\vt F_i - \vt B_j\right)}\right)     \left(\vt I_k - \vt B_j \right).

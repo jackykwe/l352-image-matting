@@ -38,31 +38,31 @@ if __name__ == "__main__":
     }
     X_AXIS_TO_LEGEND = {
         "#U": "#U",
-        "#U/HW": "#U/HW",
-        "FAGS": "Foreground Average Gradient Strength",
-        "BAGS": "Background Average Gradient Strength",
-        "UAGS": "Unknown Average Gradient Strength",
-        "AGS": "Average Gradient Strength"
+        # "#U/HW": "#U/HW",
+        # "FAGS": "Foreground Average Gradient Strength",
+        # "BAGS": "Background Average Gradient Strength",
+        # "UAGS": "Unknown Average Gradient Strength",
+        # "AGS": "Average Gradient Strength"
     }
     Y_AXIS_TO_LEGEND = {
-        "time_taken": "Time Taken [s]",
-        "SAE": "Sum of Absolute Error",
-        "MSE": "Mean Squared Error",
-        "PSNR": "Peak Signal-to-Noise Ratio [dB]"
+        "time_taken": "Execution time [s]",
+        # "SAE": "Sum of Absolute Error",
+        # "MSE": "Mean Squared Error",
+        # "PSNR": "Peak Signal-to-Noise Ratio [dB]"
     }
     X_AXIS_TO_FILENAMESTR = {
         "#U": "U",
-        "#U/HW": "UdivHW",
-        "FAGS": "FAGS",
-        "BAGS": "BAGS",
-        "UAGS": "UAGS",
-        "AGS": "AGS"
+        # "#U/HW": "UdivHW",
+        # "FAGS": "FAGS",
+        # "BAGS": "BAGS",
+        # "UAGS": "UAGS",
+        # "AGS": "AGS"
     }
     Y_AXIS_TO_FILENAMESTR = {
         "time_taken": "t",
-        "SAE": "SAE",
-        "MSE": "MSE",
-        "PSNR": "PSNR"
+        # "SAE": "SAE",
+        # "MSE": "MSE",
+        # "PSNR": "PSNR"
     }
     ####################
     # IMAGE STATISTICS #
@@ -158,7 +158,7 @@ if __name__ == "__main__":
             fig, ax = plt.subplots(figsize=(8, 5))
             for scheme_tag in SCHEME_TAGS_TO_LEGEND:
                 df_scheme = scheme_tag_to_df_scheme[scheme_tag].sort_values(x_metric)
-                ax.plot(df_scheme[x_metric], df_scheme[y_metric], label=SCHEME_TAGS_TO_LEGEND[scheme_tag])
+                ax.plot(df_scheme[x_metric], df_scheme[y_metric], label=SCHEME_TAGS_TO_LEGEND[scheme_tag], alpha=1 if scheme_tag in ("lowres-closedform", "lowres-robust-global_random_same", "lowres-robust-global_random", "lowres-aematter") else 0.1)
                 # if scheme_tag == "lowres-robust-global_random_same":
                 #     break
             ax.legend()
