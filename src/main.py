@@ -21,7 +21,7 @@ import utils
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        prog="L352 Mini-Project",
+        prog="python3 main.py",
         description="Perform alpha matting on given inputs",
         epilog="jwek2",
     )
