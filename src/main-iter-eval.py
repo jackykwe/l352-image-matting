@@ -143,6 +143,9 @@ if __name__ == "__main__":
         #     print(scheme_tag_to_df_scheme[scheme_tag])
         #     break
 
+    print(scheme_tag_to_df_scheme["lowres-robust-local_spread-nearest_candidates_count50"].loc[:, ["image_name", "SAE", "MSE", "PSNR", "time_taken"]])
+    # raise
+
     statistic_table = pd.DataFrame.from_dict(
         {scheme_tag: df_scheme.loc[:, ["SAE", "MSE", "PSNR", "time_taken"]].mean() for scheme_tag, df_scheme in scheme_tag_to_df_scheme.items()},
         orient="index"
@@ -152,7 +155,7 @@ if __name__ == "__main__":
 
     for y_metric in tqdm(Y_AXIS_TO_LEGEND, desc="Saving figures"):
         for x_metric in X_AXIS_TO_LEGEND:
-            fig, ax = plt.subplots(figsize=(6, 4))
+            fig, ax = plt.subplots(figsize=(8, 5))
             for scheme_tag in SCHEME_TAGS_TO_LEGEND:
                 df_scheme = scheme_tag_to_df_scheme[scheme_tag].sort_values(x_metric)
                 ax.plot(df_scheme[x_metric], df_scheme[y_metric], label=SCHEME_TAGS_TO_LEGEND[scheme_tag])

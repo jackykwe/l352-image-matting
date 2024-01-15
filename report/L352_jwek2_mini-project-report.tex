@@ -40,6 +40,7 @@
 \newcommand{\textgrey}[1]{\textcolor{gray}{#1}}
 \DeclareMathOperator*{\argmin}{argmin}
 \usepackage{mathrsfs}
+\usepackage{booktabs}
 % Boilerplate for appendix TOC courtesy of https://tex.stackexchange.com/a/419290
 \usepackage{minitoc}
 \renewcommand \thepart{}
@@ -60,7 +61,7 @@
 %\setcounter{section}{-1}
 
 \usepackage{multicol}
-\title{Image matting}
+\title{\vspace{-3em} Image matting}
 \author{Jacky~W.E.~Kung}
 \date{15 January 2024}
 
@@ -74,7 +75,7 @@
 \maketitle
 \begin{abstract}
     Image matting is a well-understood problem, and there exists closed-form solutions. However, as the problem is fundamentally underdetermined, there is no single ``correct'' solution, and thus algorithms in literature have considerable flexibility in defining what a ``best'' solution is and how to obtain it. This work reimplements one sampling-based and one propagation-based classical matting algorithm, and discusses code optimisation strategies. A detailed mathematical treatment of the underlying concepts is consolidated and presented. Quantitative and qualitative comparisons with today's state of the art deep learning algorithm are presented. The mathematical notation adopted in this work is outlined in Appendix~\ref{appendix:notation}.
-    \textbf{ ANY QUANTITATIVE RESULTS TO REPORT? DO THEY MATCH THE ORIGINAL?  potential robust matting skill issue.. }
+    % \textbf{ ANY QUANTITATIVE RESULTS TO REPORT? DO THEY MATCH THE ORIGINAL?  potential robust matting skill issue.. }
 \end{abstract}
 \begin{multicols}{2}[]
 
@@ -99,7 +100,7 @@
 The process of matting an image involves separating foreground objects from the background. Formally, the matting equation is defined at each pixel $k$ of the image $\mt I$ by $$\vt I_k = \alpha_{k} \vt F_{k}  + (1-\alpha_k) \vt B_k$$
 where $\alpha_{k}\in[0,1]$, and $\mt F, \mt B$ are the unknown ``foreground'' and ``background'' images. Explicit definition of mathematical symbols are in Appendix~\ref{appendix:theorem-1-statement}.   The alpha mask is fractional to allow smooth handling of fine details such as hairs, and also for motion blurring \cite{bayesian-matting}. The image matting problem is then to estimate $\vts \alpha, \mt F, \mt B$ using $\mt I$ and additional information from a user. This can take the form of \emph{trimaps}, in which the user annotates pixel regions that are definitely foreground, definitely background, and ambiguous.  The traditional green/blue screen technique works, but we are interested in matting for general images that do not have a monochrome background.
 
-To the best of my knowledge, only a \verb|C++| implementation \cite{web:robust-cpp-github} exists for Robust Matting \cite{robust-matting}, and it cannot be compiled in 2024 due to outdated dependencies.  This work reimplements both Robust Matting and Closed-form Matting \cite{closed-form-matting} in Python. While there exists a Python implementation for the latter \cite{web:closed-form-python-github}, reimplementation without referring to it was done to obtain a deeper understanding of its mathematical foundations, which are also necessary for understanding Robust Matting. Furthermore, this work presents an evaluation of various sampling strategies for Robust Matting, which was left out in the original paper. Finally, a brief performance comparison with today's state of the art deep neural network (DNN) algorithm is performed.
+To the best of my knowledge, only a third-party \verb|C++| implementation \cite{web:robust-cpp-github} exists for Robust Matting \cite{robust-matting}, and it cannot be compiled in 2024 due to outdated dependencies.  This work reimplements both Robust Matting and Closed-form Matting \cite{closed-form-matting} in Python. While there exists a Python implementation for the latter \cite{web:closed-form-python-github}, reimplementation without referring to it was done to obtain a deeper understanding of its mathematical foundations, which are also necessary for understanding Robust Matting. Furthermore, this work presents an evaluation of various sampling strategies for Robust Matting, which was left out in the original paper. Finally, a brief performance comparison with today's state of the art deep neural network (DNN) algorithm is performed.
 
 
 
@@ -278,7 +279,9 @@ Together with appropriate use of 3D \verb|numpy| arrays, this reduces the runtim
 
 
 \paragraph{Sampling strategies.}
-The original paper suggests spreading out the foreground and background boundary samples, but leaves concrete details out. In this work, we implement six different sampling schemes. \verb|global_random| samples randomly from all boundary pixels; \verb|local_random| samples randomly from nearby boundary pixels; \verb|nearest| samples the nearest boundary pixels; \verb|global_spread| evenly spreads out the samples throughout all boundary pixels; \verb|local_spread| evenly spreads out samples throughout nearby boundary pixels. \verb|global_random_same| is similar to \verb|global_random| but all unknown pixels use the same samples. These are illustrated in Figure~\ref{fig:sampling}. We suspect that \verb|local_spread| would perform best as the samples are both localised and spread out, which retains relevance of samples to the unknown pixel while increasing the probability of finding a good pair. Technically, a brute force search between all possible pairs using the full foreground and background boundaries would find the best possible pair given the image and trimap, but since it is computationally too expensive to perform, sampling is necessary.
+The original paper suggests spreading out the foreground and background boundary samples, but leaves concrete details out. In this work, we implement six different sampling schemes. \verb|global_random| samples randomly from all boundary pixels; \verb|local_random| samples randomly from nearby boundary pixels; \verb|nearest| samples the nearest boundary pixels; \verb|global_spread| evenly spreads out the samples throughout all boundary pixels; \verb|local_spread| evenly spreads out samples throughout nearby boundary pixels. \verb|global_random_same| is similar to \verb|global_random| but all unknown pixels use the same samples. These are illustrated in Figure~\ref{fig:sampling}. Spreading is performed by ranking the candidate boundary pixels by proximity, then evenly sampling across the ranks.
+
+We suspect that \verb|local_spread| would perform best as the samples are both localised and spread out, which retains relevance of samples to the unknown pixel while increasing the probability of finding a good pair. Technically, a brute force search between all possible pairs using the full foreground and background boundaries would find the best possible pair given the image and trimap, but it is computationally too expensive.
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.7\linewidth]{sampling}
@@ -303,10 +306,10 @@ $$\mt L_u \vt A_u = -\mt R^T \vt A_k$$
 where $\vt A_k$ is a length $(2+\# K)$ vector containing 1s for foreground pixels and 0s for background pixels.
 
 \subsection{AEMatter}
-The Python code provided by the authors is used as is, with minor modifications to enable usage on \emph{Google Colab}.
+The Python code provided by the authors is used as is, with only minor modifications to enable usage on \emph{Google Colab}. Execution requires a CUDA-enabled GPU.
 
 \section{Evaluation}\label{evaluation}
-\emph{The "Evaluation" section should compare the method to the state-of-the-art, provide an evidence for improvement (or lack of it). The reported results should also show the limitations of the technique.}
+% \emph{The "Evaluation" section should compare the method to the state-of-the-art, provide an evidence for improvement (or lack of it). The reported results should also show the limitations of the technique.}
 %https://people.csail.mit.edu/fredo/FredoGoodWriting.pdf
 %• Your results should support your claims
 %• Be critical
@@ -322,51 +325,72 @@ The Python code provided by the authors is used as is, with minor modifications 
 %PSNR equivalent to MSE. (supervisor)
 %MSE within unknown area
 
-Jesus christ this table is hard to insert
-% \begin{table}[H]
-%     \centering
-%     \resizebox{\columnwidth}{!}{%
-%     \begin{tabular}{@{}llccc@{}}
-%     \toprule
-%     \multicolumn{2}{c}{\textbf{Algorithm}} & \textbf{SAE} & \textbf{MSE} & \textbf{Time Taken [s]} \\ \midrule
-%     \multirow{14}{*}{Robust} & \texttt{global_spread} & 10325k & 2665 & 56.5 \\
-%      & \texttt{global_random_same} & 10038k & 2615 & 38.5 \\
-%      & \texttt{global_random} & 10159k & 2564 & 41.3 \\
-%      & \texttt{local_spread (nearest 1000)} & 9112k & 2209 & 56.6 \\
-%      & \texttt{local_random (nearest 1000)} & 9017k & 2157 & 63.1 \\
-%      & \texttt{local_spread (nearest 500)} & 8275k & 1967 & 56.6 \\
-%      & \texttt{local_random (nearest 500)} & 8233k & 1935 & 61.7 \\
-%      & \texttt{local_spread (nearest 200)} & 7019k & 1615 & 56.4 \\
-%      & \texttt{local_random (nearest 200)} & 6966k & 1588 & 61.1 \\
-%      & \texttt{local_spread (nearest 100)} & 6094k & 1360 & 56.2 \\
-%      & \texttt{local_random (nearest 100)} & 6065k & 1345 & 60.9 \\
-%      & \texttt{local_random (nearest 50)} & 5390k & 1201 & 60.7 \\
-%      & \texttt{local_spread (nearest 50)} & 5188k & 1169 & 56.1 \\
-%      & \texttt{nearest} & 4768k & 1113 & 55.9 \\
-%     \multicolumn{2}{l}{Closed-form} & 1949k & 450.2 & 3.47 \\
-%     \multicolumn{2}{l}{AEMatter} & \textbf{611k} & \textbf{52.66} & 1.51 \\ \bottomrule
-%     \end{tabular}%
-%     }
-%     \caption{}
-%     \label{tbl:statistics-table}
-% \end{table}
+\subsection{Dataset and Methodology}
+The evaluation dataset is obtained from the \emph{AlphaMatting} website \cite{alpha-matting-dot-com}. It contains 27 low-resolution images, and comes with the ground truth alpha image, as well as a coarser trimap and a finer trimap. While finer trimaps yield better results \cite{robust-matting}, this work uses only the coarser trimaps as they better match the quality of trimaps end-users would be able to produce in realistic scenarios.
 
+Each matting algorithm (Closed-Form, Robust and its variants, and AEMatter) is given the 27 images in turn, and the final alpha images are saved and compared with the ground truth. For the \verb|local_random| and \verb|local_spread| variants of Robust Matting, a range of nearby thresholds $\in\{50,100,200,500,1000\}$ are evaluated (from which 20 foreground/background pixels are sampled).
+\subsection{Quantitative Results}
+The results for each matting algorithm is shown in Table~\ref{tbl:statistics-table}. As expected, the state of the art deep learning approach significantly outperforms the classical approaches. Surprisingly, all variants of Robust Matting implemented by this work significantly underperforms Closed-form Matting, despite the original paper claiming superiority over Closed-form Matting. One possible explanation may be that sampling-based methods are generally inferior to propagation-based methods: Closed-form Matting solves a fully-deterministic sparse linear system, while Robust Matting obtains optimal samples only by chance. Another explanation may be implementation errors on my part. Mathematical errors are unlikely as I have verified the mathematical equivalence of my code with the third-party implementation \cite{web:robust-cpp-github}. The poor performance may be attributed to the sampling phase of the code.
 
+It is also surprising that the \verb|nearest| variant performed the best, as the original paper explained that such a sampling strategy is precisely the limiting factor of older sampling-based algorithms. As the original authors did not release a reference implementation, there is no direct way to verify the claims in their paper.
 
-Closed form: Input is trimap so the \verb|-T| parameter.
-All of them: SPEED. VS H VS W VS NUMBER OF UNKNOWN PIXELS VS PCT OF UNKNOWN PIXELS
-All of them: PSNR, ...etc?
+The classical algorithms are executed on a Intel Core i7 CPU at $\SI{1.80}{\giga\hertz}$, and AEMatter is executed on a NVIDIA Tesla T4 GPU. The run times of each algorithm as a function of $\#U$ is illustrated in Figure~\ref{fig:t-against-U}. In general, the run time of AEMatter and Closed-Form do not depend on $\#U$. They are also much faster than the sampling-based Robust algorithm which takes about a minute per iamge. The \verb|global_random| and \verb|global_random_same| variants of Robust Matting are slightly quicker as they do not involve sorting the boundary pixels by proximity to each unknown pixel.
 
-ROBUST: EVALUATE ALL CHOICES. MAYBE ON LOWRES SINCE FASTER. HIGHRES TOO SLOW!
+\subsection{Qualitative Results}
+We look more closely at the output of the \verb|local_spread| (nearest 50) variant of Robust Matting. Its performance is the worst for image \verb|GT26.png|, shown in Figure~\ref{fig:qualitative}. Robust Matting suffers from severe ``haloing'' in majority of the trimap-marked unknown regions. The trimaps produced by the other two algorithms are much cleaner. However, Robust Matting tends to preserve thin foreground structures better than Closed-form Matting, as circled in green and red.
 
-DO PRELIM EXPERIMENTS TMR DAY; IDLE TIME DINNER IS EQUALS CHIONG EXPERIMENTS. THE REST, WRITE.
+\begin{table}[H]
+    \centering
+    \resizebox{\columnwidth}{!}{%
+    \begin{tabular}{@{}llccc@{}}
+    \toprule
+    \multicolumn{2}{c}{\textbf{Algorithm}} & \textbf{SAE} & \textbf{MSE} & \textbf{Time Taken [s]} \\ \midrule
+    \multirow{14}{*}{Robust} & \texttt{global\_spread} & 10325k & 2665 & 56.5 \\
+     & \texttt{global\_random\_same} & 10038k & 2615 & 38.5 \\
+     & \texttt{global\_random} & 10159k & 2564 & 41.3 \\
+     & \texttt{local\_spread} (nearest 1000) & 9112k & 2209 & 56.6 \\
+     & \texttt{local\_random} (nearest 1000) & 9017k & 2157 & 63.1 \\
+     & \texttt{local\_spread} (nearest 500) & 8275k & 1967 & 56.6 \\
+     & \texttt{local\_random} (nearest 500) & 8233k & 1935 & 61.7 \\
+     & \texttt{local\_spread} (nearest 200) & 7019k & 1615 & 56.4 \\
+     & \texttt{local\_random} (nearest 200) & 6966k & 1588 & 61.1 \\
+     & \texttt{local\_spread} (nearest 100) & 6094k & 1360 & 56.2 \\
+     & \texttt{local\_random} (nearest 100) & 6065k & 1345 & 60.9 \\
+     & \texttt{local\_random} (nearest 50) & 5390k & 1201 & 60.7 \\
+     & \texttt{local\_spread} (nearest 50) & 5188k & 1169 & 56.1 \\
+     & \texttt{nearest} & 4768k & 1113 & 55.9 \\
+    \multicolumn{2}{l}{Closed-form} & 1949k & 450.2 & 3.47 \\
+    \multicolumn{2}{l}{AEMatter} & \textbf{611k} & \textbf{52.66} & \textbf{1.51} \\ \bottomrule
+    \end{tabular}%
+    }
+    \caption{Metrics for each algorithm, averaged across the 27 evaluation images. The rows are sorted in descending order of MSE. For all metrics, lower is better. SAE is expressed to nearest thousand, MSE to 4 significant figures and time to 3 significant figures.}
+    \label{tbl:statistics-table}
+\end{table}
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{t-against-U}
+    \caption{}
+    \label{fig:t-against-U}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{qualitative}
+    \caption{Comparison of \texttt{GT26.png} in the evaluation dataset.}
+    \label{fig:qualitative}
+\end{figure}
 
 \section{Conclusions}
-\emph{The "Conclusions" sections should draw some insights from the work done, suggest future directions.}
+% \emph{The "Conclusions" sections should draw some insights from the work done, suggest future directions.}
 %https://people.csail.mit.edu/fredo/FredoGoodWriting.pdf
 %Future work: Don't: Why would you discuss your future research?
 %• Only useful as a discussion of current limitations.
+
+This work presents an efficient and effective implementation of Closed-form Matting. Attempts at implementing Robust Matting were semi-effective, and the output alpha images do not perform up to the promises of the original paper. We suspect that Robust Matting works really well in practice: there could be caveats omitted from the paper for commercialisation purposes. We also present an implementation and evaluation of six different sampling strategies, and showed that sampling the nearest boundary known pixels led to the best performance.
+
+Investigatation of the surprisingly poor performance of Robust Matting is the primary future direction for this work. Its execution time could also be improved: the bottleneck is the sampling phase, which performs expensive computation for each unknown pixel in the trimap.
+
 
 \end{multicols}
 \newpage
@@ -401,6 +425,7 @@ The (perhaps usual) notational standard of denoting scalars as unbolded, vectors
     \item Subscripts are by default used to index elements of a vector or matrix, as shown above. Where subscripts are required to \emph{parametrise (i.e.\ express a different version of)} a vector/matrix instead, I bracket them, such as $w_{(k)}, \vts \mu_{(k)}, \mt G_{(k)}$.
 \end{itemize}
 
+\newpage
 \section{Theorem 1} \label{appendix:theorem-1}
 To the best of my knowledge, there is no full proof of Theorem 1 available on the public domain. The original paper \cite{closed-form-matting} and Li et al.\ \cite{closed-form-survey} present partial proofs for the greyscale case, but the coloured image case is omitted. I present the full proof of the coloured image case; the full proof for the greyscale image case is conceptually identical and can be derived as a simplification.
 % This appendix presents the proof for the greyscale and colour version of Theorem 1. The proofs are structurally identical. The colour version just involves more matrix definitions and gymnastics.
@@ -641,6 +666,7 @@ where the notational change from $\delta_{xy}$ to $\delta_{ij}$ is justified bec
 
 
 
+\newpage
 \section{Proof: Computation of matting Laplacian via $\mt L = \mt D - \mt W$} \label{appendix:w-sum-zero-proof}
 From Section~\ref{s3-closed-form-matting}, we define the matrix $\mt W$ as
 $$ W_{i,j} = \sum_{\substack{k\in K:\\i\in w_{(k)}\\\wedge j\in w_{(k)}}} \frac1{M^2}\left(1 + \left(\vt{I}_i - \vts \mu_{(k)}\right)^T \left(\mts \Sigma_{(k)} + \frac\epsilon{M^2} \mt{I}_{3\times 3}\right)^{-1} \left(\vt{I}_j - \vts \mu_{(k)}\right) \right). $$
@@ -702,6 +728,7 @@ Putting everything together, noting that $D_{i,j}=0$ for $i\neq j$, we are done:
 
 $$W_{i,j} = \sum_{\substack{k\in K:\\i\in w_{(k)}\\\wedge j\in w_{(k)}}} \frac1{M^2}\left(1 + \left(\vt{I}_i - \vts \mu_{(k)}\right)^T \left(\mts \Sigma_{(k)} + \frac\epsilon{M^2} \mt{I}_{3\times 3}\right)^{-1} \left(\vt{I}_j - \vts \mu_{(k)}\right) \right)$$
 
+\newpage
 \section{Proof: Robust Matting foreground-background sample pair confidence} \label{appendix:robust-confidence}
 Note that for a vector $\vt x$, $\|\vt x\|^2 = \vt x^T\vt x$. We interchange between these for convenience.
 \begin{align*}
